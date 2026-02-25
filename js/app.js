@@ -7,8 +7,8 @@ const orderState = {
   store: null,
   timing: 'now',
   currentCategory: null,
-  selectedPizza: null,
-  currentPizza: {
+  selectedProduct: null,     // the product being customized
+  currentCustomization: {    // customization state (for customizable products)
     size: 'medium',
     crust: 'hand-tossed',
     toppings: [],
@@ -28,7 +28,21 @@ const orderState = {
   confirmation: null
 };
 
+
+
 let currentStep = 1;
+
+// ============ AGENT MODAL ============
+function showAgentModal(agentName) {
+  const overlay = document.getElementById('agentModal');
+  const text = document.getElementById('agentModalText');
+  text.textContent = `${agentName} is creating your order`;
+  overlay.style.display = 'flex';
+}
+
+function hideAgentModal() {
+  document.getElementById('agentModal').style.display = 'none';
+}
 
 // ============ STEP NAVIGATION ============
 function goToStep(step, skipHistoryUpdate = false) {
@@ -43,7 +57,7 @@ function goToStep(step, skipHistoryUpdate = false) {
     case 1: renderHomeCategoryGrid(); break;
     case 2: renderLocation(); break;
     case 3: renderCategories(); break;
-    case 4: renderPizzaList(); break;
+    case 4: renderProductList(); break;
     case 5: renderCustomize(); break;
     case 6: renderCart(); break;
     case 7: renderCheckout(); break;
@@ -208,52 +222,59 @@ function selectCategory(categoryId) {
   goToStep(4);
 
   const cat = CATEGORIES.find(c => c.id === categoryId);
-  const items = PIZZAS; // For now, all categories show pizzas
+  const items = getProductsByCategory(categoryId);
   const categoryName = cat ? cat.name : categoryId;
 
   document.getElementById('categoryTitle').textContent = categoryName.toUpperCase();
 
   return {
-    content: [{ type: 'text', text: `Showing ${categoryName}. ${items.length} items available: ${items.map(p => p.name).join(', ')}. Select a pizza to customize.` }],
+    content: [{ type: 'text', text: `Showing ${categoryName}. ${items.length} items available: ${items.map(p => p.name).join(', ')}. ${items.some(p => p.customizable) ? 'Select a product to customize.' : 'Select a product to add to your order.'}` }],
     orderState: { ...getStateSnapshot(), currentCategory: categoryId },
-    availableItems: items.map(p => ({ id: p.id, name: p.name, description: p.description, basePrice: p.basePrice, tags: p.tag }))
+    availableItems: items.map(p => ({ id: p.id, name: p.name, description: p.description, basePrice: p.basePrice, tags: p.tag, customizable: p.customizable }))
   };
 }
 
-// ============ STEP 4: PIZZA SELECTION ============
-function renderPizzaList() {
-  const grid = document.getElementById('pizzaGrid');
-  grid.innerHTML = PIZZAS.map(pizza => `
-    <div class="pizza-card" onclick="selectPizzaUI('${pizza.id}')">
+// ============ STEP 4: PRODUCT SELECTION ============
+function renderProductList() {
+  const grid = document.getElementById('productGrid');
+  const items = getProductsByCategory(orderState.currentCategory);
+  grid.innerHTML = items.map(product => `
+    <div class="pizza-card" onclick="selectProductUI('${product.id}')">
       <div class="pizza-card-img-wrap">
-        ${pizza.tag ? `<span class="pizza-card-badge ${pizza.tag === 'TRENDING' ? 'trending' : ''}">${pizza.tag}</span>` : ''}
-        <div class="pizza-card-img-placeholder">🍕</div>
-        <button class="pizza-card-cart-btn" onclick="event.stopPropagation(); quickAddPizza('${pizza.id}')">🛒</button>
+        ${product.tag ? `<span class="pizza-card-badge ${product.tag === 'TRENDING' ? 'trending' : ''}">${product.tag}</span>` : ''}
+        <div class="pizza-card-img-placeholder">${product.emoji || '🍽️'}</div>
+        <button class="pizza-card-cart-btn" onclick="event.stopPropagation(); quickAddProduct('${product.id}')">🛒</button>
       </div>
       <div class="pizza-card-info">
-        <div class="pizza-card-name">${pizza.name}</div>
-        <div class="pizza-card-desc">${pizza.description}</div>
-        <div class="pizza-card-price">From $${pizza.basePrice.toFixed(2)}</div>
+        <div class="pizza-card-name">${product.name}</div>
+        <div class="pizza-card-desc">${product.description}</div>
+        <div class="pizza-card-price">${product.customizable ? 'From ' : ''}$${product.basePrice.toFixed(2)}</div>
       </div>
     </div>
   `).join('');
 }
 
-function selectPizzaUI(pizzaId) {
-  return selectPizza(pizzaId);
+function selectProductUI(productId) {
+  return selectProduct(productId);
 }
 
-function selectPizza(pizzaId) {
-  const pizza = PIZZAS.find(p => p.id === pizzaId);
-  if (!pizza) {
-    return { content: [{ type: 'text', text: `Error: Pizza "${pizzaId}" not found. Available: ${PIZZAS.map(p => p.id).join(', ')}` }] };
+function selectProduct(productId) {
+  const product = getProductById(productId);
+  if (!product) {
+    return { content: [{ type: 'text', text: `Error: Product "${productId}" not found.` }] };
   }
 
-  orderState.selectedPizza = pizza;
-  orderState.currentPizza = {
+  // Non-customizable products go straight to cart
+  if (!product.customizable) {
+    return addSimpleProduct(product);
+  }
+
+  // Customizable products (pizzas) go to the customize step
+  orderState.selectedProduct = product;
+  orderState.currentCustomization = {
     size: 'medium',
     crust: 'hand-tossed',
-    toppings: [...pizza.defaultToppings],
+    toppings: [...(product.defaultToppings || [])],
     quantity: 1
   };
 
@@ -264,27 +285,66 @@ function selectPizza(pizzaId) {
   const toppingsAvail = TOPPINGS.map(t => t.id).join(', ');
 
   return {
-    content: [{ type: 'text', text: `Selected ${pizza.name} ($${pizza.basePrice.toFixed(2)} base). Default toppings: ${pizza.defaultToppings.join(', ') || 'none'}. Ready to customize. Available sizes: ${sizesAvail}. Available crusts: ${crustsAvail}. Available toppings: ${toppingsAvail}. Use customize-pizza to set options, then add-to-cart.` }],
-    orderState: { ...getStateSnapshot(), selectedPizza: { id: pizza.id, name: pizza.name, basePrice: pizza.basePrice } },
+    content: [{ type: 'text', text: `Selected ${product.name} ($${product.basePrice.toFixed(2)} base). Default toppings: ${(product.defaultToppings || []).join(', ') || 'none'}. Ready to customize. Available sizes: ${sizesAvail}. Available crusts: ${crustsAvail}. Available toppings: ${toppingsAvail}. Use customize-pizza to set options, then add-to-cart.` }],
+    orderState: { ...getStateSnapshot(), selectedProduct: { id: product.id, name: product.name, basePrice: product.basePrice } },
     customizationOptions: { sizes: SIZES, crusts: CRUSTS, toppings: TOPPINGS }
   };
 }
 
-// Quick add with defaults
-function quickAddPizza(pizzaId) {
-  selectPizza(pizzaId);
-  addToCart();
+// Add a non-customizable product directly to cart
+function addSimpleProduct(product, quantity = 1) {
+  // Check if already in cart — increment quantity
+  const existing = orderState.cart.find(item => item.product.id === product.id && !item.size);
+  if (existing) {
+    existing.quantity += quantity;
+    existing.price = existing.unitPrice * existing.quantity;
+  } else {
+    orderState.cart.push({
+      product: product,
+      quantity: quantity,
+      unitPrice: product.basePrice,
+      price: product.basePrice * quantity,
+      name: product.name,
+      calories: product.calories || ''
+    });
+  }
+
+  goToStep(6);
+
+  const subtotal = getCartSubtotal();
+  return {
+    content: [{ type: 'text', text: `Added ${product.name} ($${product.basePrice.toFixed(2)}) to cart. Subtotal: $${subtotal.toFixed(2)} (${orderState.cart.length} items). You can continue shopping or proceed-to-checkout.` }],
+    orderState: { ...getStateSnapshot(), cart: { items: orderState.cart, subtotal } }
+  };
 }
 
-// ============ STEP 5: CUSTOMIZE PIZZA ============
-function renderCustomize() {
-  const pizza = orderState.selectedPizza;
-  if (!pizza) return;
-  const cp = orderState.currentPizza;
+// Quick add with defaults
+function quickAddProduct(productId) {
+  const product = getProductById(productId);
+  if (!product) return;
+  if (product.customizable) {
+    selectProduct(productId);
+    addToCart();
+  } else {
+    addSimpleProduct(product);
+  }
+}
 
-  document.getElementById('customizePizzaName').textContent = pizza.name.toUpperCase();
-  document.getElementById('customizePizzaDesc').textContent = pizza.description;
-  document.getElementById('customizeThumbName').textContent = pizza.name.toUpperCase();
+function addSideUI(productId) {
+  const product = getProductById(productId);
+  if (!product) return;
+  addSimpleProduct(product);
+}
+
+// ============ STEP 5: CUSTOMIZE PRODUCT ============
+function renderCustomize() {
+  const product = orderState.selectedProduct;
+  if (!product) return;
+  const cp = orderState.currentCustomization;
+
+  document.getElementById('customizePizzaName').textContent = product.name.toUpperCase();
+  document.getElementById('customizePizzaDesc').textContent = product.description;
+  document.getElementById('customizeThumbName').textContent = product.name.toUpperCase();
 
   // Quantity
   document.getElementById('qtyValue').textContent = cp.quantity;
@@ -309,17 +369,17 @@ function renderCustomize() {
 }
 
 function setCrust(crustId) {
-  orderState.currentPizza.crust = crustId;
+  orderState.currentCustomization.crust = crustId;
   renderCustomize();
 }
 
 function setSize(sizeId) {
-  orderState.currentPizza.size = sizeId;
+  orderState.currentCustomization.size = sizeId;
   renderCustomize();
 }
 
 function toggleTopping(toppingId) {
-  const toppings = orderState.currentPizza.toppings;
+  const toppings = orderState.currentCustomization.toppings;
   const idx = toppings.indexOf(toppingId);
   if (idx >= 0) toppings.splice(idx, 1);
   else toppings.push(toppingId);
@@ -327,47 +387,48 @@ function toggleTopping(toppingId) {
 }
 
 function changeQuantity(delta) {
-  orderState.currentPizza.quantity = Math.max(1, orderState.currentPizza.quantity + delta);
-  document.getElementById('qtyValue').textContent = orderState.currentPizza.quantity;
+  orderState.currentCustomization.quantity = Math.max(1, orderState.currentCustomization.quantity + delta);
+  document.getElementById('qtyValue').textContent = orderState.currentCustomization.quantity;
 }
 
 function customizePizza({ size, crust, toppings, quantity } = {}) {
-  if (!orderState.selectedPizza) {
-    return { content: [{ type: 'text', text: 'Error: No pizza selected. Use select-pizza first.' }] };
+  if (!orderState.selectedProduct) {
+    return { content: [{ type: 'text', text: 'Error: No product selected. Use select-pizza first.' }] };
   }
 
-  if (size && SIZES.find(s => s.id === size)) orderState.currentPizza.size = size;
-  if (crust && CRUSTS.find(c => c.id === crust)) orderState.currentPizza.crust = crust;
-  if (toppings && Array.isArray(toppings)) orderState.currentPizza.toppings = toppings;
-  if (quantity && quantity >= 1) orderState.currentPizza.quantity = quantity;
+  if (size && SIZES.find(s => s.id === size)) orderState.currentCustomization.size = size;
+  if (crust && CRUSTS.find(c => c.id === crust)) orderState.currentCustomization.crust = crust;
+  if (toppings && Array.isArray(toppings)) orderState.currentCustomization.toppings = toppings;
+  if (quantity && quantity >= 1) orderState.currentCustomization.quantity = quantity;
 
   renderCustomize();
 
-  const price = calculatePizzaPrice();
-  const cp = orderState.currentPizza;
+  const price = calculateCustomizedPrice();
+  const cp = orderState.currentCustomization;
   const sizeObj = SIZES.find(s => s.id === cp.size);
   const crustObj = CRUSTS.find(c => c.id === cp.crust);
 
   return {
-    content: [{ type: 'text', text: `Pizza customized: ${sizeObj.name} ${crustObj.name} ${orderState.selectedPizza.name}. Toppings: ${cp.toppings.join(', ') || 'none'}. Quantity: ${cp.quantity}. Price: $${price.toFixed(2)}. Use add-to-cart to add to cart.` }],
+    content: [{ type: 'text', text: `Pizza customized: ${sizeObj.name} ${crustObj.name} ${orderState.selectedProduct.name}. Toppings: ${cp.toppings.join(', ') || 'none'}. Quantity: ${cp.quantity}. Price: $${price.toFixed(2)}. Use add-to-cart to add to cart.` }],
     orderState: { ...getStateSnapshot(), currentPizza: { ...cp, price } }
   };
 }
 
-function calculatePizzaPrice() {
-  const pizza = orderState.selectedPizza;
-  const cp = orderState.currentPizza;
-  if (!pizza) return 0;
+function calculateCustomizedPrice() {
+  const product = orderState.selectedProduct;
+  const cp = orderState.currentCustomization;
+  if (!product) return 0;
 
   const sizeObj = SIZES.find(s => s.id === cp.size);
   const crustObj = CRUSTS.find(c => c.id === cp.crust);
 
-  let price = pizza.basePrice;
+  let price = product.basePrice;
   price += sizeObj ? sizeObj.priceModifier : 0;
   price += crustObj ? crustObj.priceModifier : 0;
 
   // Extra toppings beyond default
-  const extraToppings = cp.toppings.filter(t => !pizza.defaultToppings.includes(t));
+  const defaults = product.defaultToppings || [];
+  const extraToppings = cp.toppings.filter(t => !defaults.includes(t));
   price += extraToppings.length * 1.50;
 
   return price * cp.quantity;
@@ -375,27 +436,28 @@ function calculatePizzaPrice() {
 
 // ============ ADD TO CART ============
 function addToCart() {
-  if (!orderState.selectedPizza) {
-    return { content: [{ type: 'text', text: 'Error: No pizza selected.' }] };
+  if (!orderState.selectedProduct) {
+    return { content: [{ type: 'text', text: 'Error: No product selected.' }] };
   }
 
-  const cp = orderState.currentPizza;
+  const cp = orderState.currentCustomization;
   const sizeObj = SIZES.find(s => s.id === cp.size);
   const crustObj = CRUSTS.find(c => c.id === cp.crust);
-  const price = calculatePizzaPrice();
+  const price = calculateCustomizedPrice();
+  const unitPrice = cp.quantity > 0 ? price / cp.quantity : price;
 
   const item = {
-    type: 'pizza',
-    pizza: orderState.selectedPizza,
+    product: orderState.selectedProduct,
     size: cp.size,
     sizeName: sizeObj.name,
     crust: cp.crust,
     crustName: crustObj.name,
     toppings: [...cp.toppings],
     quantity: cp.quantity,
+    unitPrice: unitPrice,
     price: price,
-    name: `${sizeObj.name} ${crustObj.name} ${orderState.selectedPizza.name}`,
-    calories: orderState.selectedPizza.calories
+    name: `${sizeObj.name} ${crustObj.name} ${orderState.selectedProduct.name}`,
+    calories: orderState.selectedProduct.calories
   };
 
   orderState.cart.push(item);
@@ -403,7 +465,7 @@ function addToCart() {
 
   const subtotal = getCartSubtotal();
   return {
-    content: [{ type: 'text', text: `Added ${item.name} to cart (qty: ${cp.quantity}). Cart total: $${subtotal.toFixed(2)} (${orderState.cart.length} item${orderState.cart.length > 1 ? 's' : ''}). You can add sides or proceed-to-checkout.` }],
+    content: [{ type: 'text', text: `Added ${item.name} to cart (qty: ${cp.quantity}). Cart total: $${subtotal.toFixed(2)} (${orderState.cart.length} item${orderState.cart.length > 1 ? 's' : ''}). You can add more items or proceed-to-checkout.` }],
     orderState: { ...getStateSnapshot(), cart: { items: orderState.cart, subtotal } }
   };
 }
@@ -420,7 +482,7 @@ function renderCart() {
   } else {
     itemsEl.innerHTML = orderState.cart.map((item, i) => `
       <div class="cart-item">
-        <div class="cart-item-img-placeholder">🍕</div>
+        <div class="cart-item-img-placeholder">${item.product ? (item.product.emoji || '🍽️') : '🍕'}</div>
         <div class="cart-item-details">
           <div class="cart-item-name">${item.name}</div>
           <div class="cart-item-meta">${item.calories || ''}</div>
@@ -430,7 +492,7 @@ function renderCart() {
               <span class="qty-value">${item.quantity}</span>
               <button class="qty-btn qty-plus" onclick="updateCartItemQty(${i}, 1)">+</button>
             </div>
-            <button class="cart-action-link" onclick="editCartItem(${i})">Edit</button>
+            ${item.product && item.product.customizable ? `<button class="cart-action-link" onclick="editCartItem(${i})">Edit</button>` : ''}
             <button class="cart-action-link" onclick="removeCartItem(${i})">Remove</button>
           </div>
         </div>
@@ -439,12 +501,13 @@ function renderCart() {
     `).join('');
   }
 
-  // Sides
-  document.getElementById('sidesGrid').innerHTML = SIDES.map(side => `
+  // Sides — show a curated selection of popular non-customizable products
+  const sideProducts = PRODUCTS.filter(p => !p.customizable && ['breads', 'loaded-tots', 'chicken', 'desserts'].includes(p.category)).slice(0, 6);
+  document.getElementById('sidesGrid').innerHTML = sideProducts.map(product => `
     <div class="side-card">
-      <div class="side-card-img-placeholder">🥖</div>
-      <button class="side-card-cart-btn" onclick="addSideUI('${side.id}')">🛒</button>
-      <div class="side-card-name">${side.name}</div>
+      <div class="side-card-img-placeholder">${product.emoji || '🥖'}</div>
+      <button class="side-card-cart-btn" onclick="addSideUI('${product.id}')">🛒</button>
+      <div class="side-card-name">${product.name}</div>
     </div>
   `).join('');
 }
@@ -454,15 +517,19 @@ function updateCartItemQty(index, delta) {
   const item = orderState.cart[index];
   item.quantity = Math.max(0, item.quantity + delta);
 
-  // Recalculate price based on quantity
-  if (item.type === 'pizza') {
+  // Recalculate price
+  if (item.product && item.product.customizable && item.size) {
+    // Customized product (pizza) — recalculate from options
     const sizeObj = SIZES.find(s => s.id === item.size);
     const crustObj = CRUSTS.find(c => c.id === item.crust);
-    let unitPrice = item.pizza.basePrice + (sizeObj ? sizeObj.priceModifier : 0) + (crustObj ? crustObj.priceModifier : 0);
-    const extraToppings = item.toppings.filter(t => !item.pizza.defaultToppings.includes(t));
+    const defaults = item.product.defaultToppings || [];
+    let unitPrice = item.product.basePrice + (sizeObj ? sizeObj.priceModifier : 0) + (crustObj ? crustObj.priceModifier : 0);
+    const extraToppings = (item.toppings || []).filter(t => !defaults.includes(t));
     unitPrice += extraToppings.length * 1.50;
+    item.unitPrice = unitPrice;
     item.price = unitPrice * item.quantity;
-  } else if (item.type === 'side') {
+  } else {
+    // Simple product
     item.price = item.unitPrice * item.quantity;
   }
 
@@ -476,14 +543,13 @@ function removeCartItem(index) {
 }
 
 function editCartItem(index) {
-  // Go back to customize with this item's settings
   const item = orderState.cart[index];
-  if (item.type === 'pizza') {
-    orderState.selectedPizza = item.pizza;
-    orderState.currentPizza = {
+  if (item.product && item.product.customizable) {
+    orderState.selectedProduct = item.product;
+    orderState.currentCustomization = {
       size: item.size,
       crust: item.crust,
-      toppings: [...item.toppings],
+      toppings: [...(item.toppings || [])],
       quantity: item.quantity
     };
     orderState.cart.splice(index, 1);
@@ -509,41 +575,6 @@ function updateCartItem({ itemIndex, quantity }) {
   const subtotal = getCartSubtotal();
   return {
     content: [{ type: 'text', text: `Cart updated. ${orderState.cart.length} item${orderState.cart.length !== 1 ? 's' : ''}, subtotal: $${subtotal.toFixed(2)}.` }],
-    orderState: { ...getStateSnapshot(), cart: { items: orderState.cart, subtotal } }
-  };
-}
-
-function addSideUI(sideId) {
-  return addSide(sideId);
-}
-
-function addSide(sideId, quantity = 1) {
-  const side = SIDES.find(s => s.id === sideId);
-  if (!side) {
-    return { content: [{ type: 'text', text: `Error: Side "${sideId}" not found. Available: ${SIDES.map(s => s.id).join(', ')}` }] };
-  }
-
-  // Check if already in cart
-  const existing = orderState.cart.find(item => item.type === 'side' && item.sideId === sideId);
-  if (existing) {
-    existing.quantity += quantity;
-    existing.price = existing.unitPrice * existing.quantity;
-  } else {
-    orderState.cart.push({
-      type: 'side',
-      sideId: side.id,
-      name: side.name,
-      unitPrice: side.price,
-      price: side.price * quantity,
-      quantity: quantity,
-      calories: ''
-    });
-  }
-
-  renderCart();
-  const subtotal = getCartSubtotal();
-  return {
-    content: [{ type: 'text', text: `Added ${side.name} ($${side.price.toFixed(2)}) to cart. Subtotal: $${subtotal.toFixed(2)} (${orderState.cart.length} items). You can add more sides or proceed-to-checkout.` }],
     orderState: { ...getStateSnapshot(), cart: { items: orderState.cart, subtotal } }
   };
 }
@@ -726,8 +757,8 @@ function startNewOrder() {
   orderState.store = null;
   orderState.timing = 'now';
   orderState.currentCategory = null;
-  orderState.selectedPizza = null;
-  orderState.currentPizza = { size: 'medium', crust: 'hand-tossed', toppings: [], quantity: 1 };
+  orderState.selectedProduct = null;
+  orderState.currentCustomization = { size: 'medium', crust: 'hand-tossed', toppings: [], quantity: 1 };
   orderState.cart = [];
   orderState.contact = { firstName: '', lastName: '', phone: '', email: '' };
   orderState.delivery = { leaveAtDoor: false, instructions: '' };
@@ -841,8 +872,8 @@ function updateURL() {
     params.set('category', orderState.currentCategory);
   }
   
-  if (orderState.selectedPizza) {
-    params.set('pizza', orderState.selectedPizza.id);
+  if (orderState.selectedProduct) {
+    params.set('pizza', orderState.selectedProduct.id);
   }
   
   if (orderState.cart.length > 0) {
@@ -875,7 +906,7 @@ function restoreFromURL() {
   
   if (params.has('pizza')) {
     const pizzaId = params.get('pizza');
-    orderState.selectedPizza = PIZZAS.find(p => p.id === pizzaId);
+    orderState.selectedProduct = getProductById(pizzaId);
   }
   
   // Go to the step from URL (skip history update since we're restoring)
