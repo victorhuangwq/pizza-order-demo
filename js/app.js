@@ -99,10 +99,7 @@ function selectOrderType(type) {
     document.getElementById('addressInput').placeholder = 'Enter city, state, or zip';
   }
 
-  return {
-    content: [{ type: 'text', text: `Order type set to ${type}. Please provide a ${type === 'delivery' ? 'delivery address' : 'location to find nearby stores'}.` }],
-    orderState: { orderType: type }
-  };
+  return `Order type set to ${type}. Please provide a ${type === 'delivery' ? 'delivery address' : 'location to find nearby stores'}.`;
 }
 
 // ============ STEP 2: LOCATION ============
@@ -140,7 +137,7 @@ function findStore() {
 function setDeliveryAddress(address) {
   if (!address) {
     showError('addressError', 'Please enter a delivery address');
-    return { content: [{ type: 'text', text: 'Error: Please enter a delivery address.' }] };
+    return 'Error: Please enter a delivery address.';
   }
   hideError('addressError');
 
@@ -156,10 +153,7 @@ function setDeliveryAddress(address) {
   document.getElementById('storeEstimateDisplay').textContent = `Delivery in ${STORE.deliveryEstimate}`;
   document.getElementById('storePhoneDisplay').textContent = STORE.phone;
 
-  return {
-    content: [{ type: 'text', text: `Found nearest store: ${STORE.name} at ${STORE.address}, ${STORE.city}, ${STORE.state} ${STORE.zip}. Delivery estimate: ${STORE.deliveryEstimate}. Phone: ${STORE.phone}. Please confirm location to proceed.` }],
-    orderState: { orderType: orderState.orderType, address, store: STORE }
-  };
+  return `Found nearest store: ${STORE.name} at ${STORE.address}, ${STORE.city}, ${STORE.state} ${STORE.zip}. Delivery estimate: ${STORE.deliveryEstimate}. Phone: ${STORE.phone}. Please confirm location to proceed.`;
 }
 
 function setTiming(timing) {
@@ -170,16 +164,13 @@ function setTiming(timing) {
 
 function confirmLocation(timing) {
   if (!orderState.address) {
-    return { content: [{ type: 'text', text: 'Error: Please enter a delivery address before confirming location.' }] };
+    return 'Error: Please enter a delivery address before confirming location.';
   }
   if (timing) setTiming(timing);
   goToStep(3);
 
   const categories = CATEGORIES.map(c => c.name).join(', ');
-  return {
-    content: [{ type: 'text', text: `Location confirmed. Order will be ${orderState.orderType} to ${orderState.address}. Showing menu categories: ${categories}. Select a category to browse items.` }],
-    orderState: { orderType: orderState.orderType, address: orderState.address, store: orderState.store, timing: orderState.timing }
-  };
+  return `Location confirmed. Order will be ${orderState.orderType} to ${orderState.address}. Showing menu categories: ${categories}. Select a category to browse items.`;
 }
 
 // ============ STEP 3: MENU CATEGORIES ============
@@ -227,11 +218,7 @@ function selectCategory(categoryId) {
 
   document.getElementById('categoryTitle').textContent = categoryName.toUpperCase();
 
-  return {
-    content: [{ type: 'text', text: `Showing ${categoryName}. ${items.length} items available: ${items.map(p => p.name).join(', ')}. ${items.some(p => p.customizable) ? 'Select a product to customize.' : 'Select a product to add to your order.'}` }],
-    orderState: { ...getStateSnapshot(), currentCategory: categoryId },
-    availableItems: items.map(p => ({ id: p.id, name: p.name, description: p.description, basePrice: p.basePrice, tags: p.tag, customizable: p.customizable }))
-  };
+  return `Showing ${categoryName}. ${items.length} items available: ${items.map(p => p.name).join(', ')}. ${items.some(p => p.customizable) ? 'Select a product to customize.' : 'Select a product to add to your order.'}`;
 }
 
 // ============ STEP 4: PRODUCT SELECTION ============
@@ -261,7 +248,7 @@ function selectProductUI(productId) {
 function selectProduct(productId) {
   const product = getProductById(productId);
   if (!product) {
-    return { content: [{ type: 'text', text: `Error: Product "${productId}" not found.` }] };
+    return `Error: Product "${productId}" not found.`;
   }
 
   // Non-customizable products go straight to cart
@@ -284,11 +271,7 @@ function selectProduct(productId) {
   const crustsAvail = CRUSTS.map(c => c.id).join(', ');
   const toppingsAvail = TOPPINGS.map(t => t.id).join(', ');
 
-  return {
-    content: [{ type: 'text', text: `Selected ${product.name} ($${product.basePrice.toFixed(2)} base). Default toppings: ${(product.defaultToppings || []).join(', ') || 'none'}. Ready to customize. Available sizes: ${sizesAvail}. Available crusts: ${crustsAvail}. Available toppings: ${toppingsAvail}. Use customize-pizza to set options, then add-to-cart.` }],
-    orderState: { ...getStateSnapshot(), selectedProduct: { id: product.id, name: product.name, basePrice: product.basePrice } },
-    customizationOptions: { sizes: SIZES, crusts: CRUSTS, toppings: TOPPINGS }
-  };
+  return `Selected ${product.name} ($${product.basePrice.toFixed(2)} base). Default toppings: ${(product.defaultToppings || []).join(', ') || 'none'}. Ready to customize. Available sizes: ${sizesAvail}. Available crusts: ${crustsAvail}. Available toppings: ${toppingsAvail}. Use customize-pizza to set options, then add-to-cart.`;
 }
 
 // Add a non-customizable product directly to cart
@@ -312,10 +295,7 @@ function addSimpleProduct(product, quantity = 1) {
   goToStep(6);
 
   const subtotal = getCartSubtotal();
-  return {
-    content: [{ type: 'text', text: `Added ${product.name} ($${product.basePrice.toFixed(2)}) to cart. Subtotal: $${subtotal.toFixed(2)} (${orderState.cart.length} items). You can continue shopping or proceed-to-checkout.` }],
-    orderState: { ...getStateSnapshot(), cart: { items: orderState.cart, subtotal } }
-  };
+  return `Added ${product.name} ($${product.basePrice.toFixed(2)}) to cart. Subtotal: $${subtotal.toFixed(2)} (${orderState.cart.length} items). You can continue shopping or proceed-to-checkout.`;
 }
 
 // Quick add with defaults
@@ -393,7 +373,7 @@ function changeQuantity(delta) {
 
 function customizePizza({ size, crust, toppings, quantity } = {}) {
   if (!orderState.selectedProduct) {
-    return { content: [{ type: 'text', text: 'Error: No product selected. Use select-pizza first.' }] };
+    return 'Error: No product selected. Use select-pizza first.';
   }
 
   if (size && SIZES.find(s => s.id === size)) orderState.currentCustomization.size = size;
@@ -408,10 +388,7 @@ function customizePizza({ size, crust, toppings, quantity } = {}) {
   const sizeObj = SIZES.find(s => s.id === cp.size);
   const crustObj = CRUSTS.find(c => c.id === cp.crust);
 
-  return {
-    content: [{ type: 'text', text: `Pizza customized: ${sizeObj.name} ${crustObj.name} ${orderState.selectedProduct.name}. Toppings: ${cp.toppings.join(', ') || 'none'}. Quantity: ${cp.quantity}. Price: $${price.toFixed(2)}. Use add-to-cart to add to cart.` }],
-    orderState: { ...getStateSnapshot(), currentPizza: { ...cp, price } }
-  };
+  return `Pizza customized: ${sizeObj.name} ${crustObj.name} ${orderState.selectedProduct.name}. Toppings: ${cp.toppings.join(', ') || 'none'}. Quantity: ${cp.quantity}. Price: $${price.toFixed(2)}. Use add-to-cart to add to cart.`;
 }
 
 function calculateCustomizedPrice() {
@@ -437,7 +414,7 @@ function calculateCustomizedPrice() {
 // ============ ADD TO CART ============
 function addToCart() {
   if (!orderState.selectedProduct) {
-    return { content: [{ type: 'text', text: 'Error: No product selected.' }] };
+    return 'Error: No product selected.';
   }
 
   const cp = orderState.currentCustomization;
@@ -464,10 +441,7 @@ function addToCart() {
   goToStep(6);
 
   const subtotal = getCartSubtotal();
-  return {
-    content: [{ type: 'text', text: `Added ${item.name} to cart (qty: ${cp.quantity}). Cart total: $${subtotal.toFixed(2)} (${orderState.cart.length} item${orderState.cart.length > 1 ? 's' : ''}). You can add more items or proceed-to-checkout.` }],
-    orderState: { ...getStateSnapshot(), cart: { items: orderState.cart, subtotal } }
-  };
+  return `Added ${item.name} to cart (qty: ${cp.quantity}). Cart total: $${subtotal.toFixed(2)} (${orderState.cart.length} item${orderState.cart.length > 1 ? 's' : ''}). You can add more items or proceed-to-checkout.`;
 }
 
 // ============ STEP 6: CART ============
@@ -559,7 +533,7 @@ function editCartItem(index) {
 
 function updateCartItem({ itemIndex, quantity }) {
   if (itemIndex < 0 || itemIndex >= orderState.cart.length) {
-    return { content: [{ type: 'text', text: `Error: Invalid item index ${itemIndex}. Cart has ${orderState.cart.length} items.` }] };
+    return `Error: Invalid item index ${itemIndex}. Cart has ${orderState.cart.length} items.`;
   }
 
   if (quantity !== undefined) {
@@ -573,25 +547,19 @@ function updateCartItem({ itemIndex, quantity }) {
 
   renderCart();
   const subtotal = getCartSubtotal();
-  return {
-    content: [{ type: 'text', text: `Cart updated. ${orderState.cart.length} item${orderState.cart.length !== 1 ? 's' : ''}, subtotal: $${subtotal.toFixed(2)}.` }],
-    orderState: { ...getStateSnapshot(), cart: { items: orderState.cart, subtotal } }
-  };
+  return `Cart updated. ${orderState.cart.length} item${orderState.cart.length !== 1 ? 's' : ''}, subtotal: $${subtotal.toFixed(2)}.`;
 }
 
 function proceedToCheckout() {
   if (orderState.cart.length === 0) {
     showError('cartError', 'Your cart is empty');
-    return { content: [{ type: 'text', text: 'Error: Your cart is empty. Add items before proceeding to checkout.' }] };
+    return 'Error: Your cart is empty. Add items before proceeding to checkout.';
   }
   hideError('cartError');
   goToStep(7);
 
   const totals = calculateTotals();
-  return {
-    content: [{ type: 'text', text: `Proceeding to checkout. Subtotal: $${totals.subtotal.toFixed(2)}, Delivery Fee: $${totals.deliveryFee.toFixed(2)}, Tax: $${totals.tax.toFixed(2)}, Total: $${totals.total.toFixed(2)}. Please set checkout info (firstName, lastName, phone, email) and delivery instructions, then place-order.` }],
-    orderState: { ...getStateSnapshot(), checkout: totals }
-  };
+  return `Proceeding to checkout. Subtotal: $${totals.subtotal.toFixed(2)}, Delivery Fee: $${totals.deliveryFee.toFixed(2)}, Tax: $${totals.tax.toFixed(2)}, Total: $${totals.total.toFixed(2)}. Please set checkout info (firstName, lastName, phone, email) and delivery instructions, then place-order.`;
 }
 
 // ============ STEP 7: CHECKOUT ============
@@ -644,7 +612,7 @@ function setCheckoutInfo({ firstName, lastName, phone, email, leaveAtDoor, deliv
     showError('lastNameError', !lastName ? 'Last name is required' : '');
     showError('phoneError', !phone || phone.replace(/\D/g, '').length < 10 ? 'Please enter a valid phone number' : '');
     showError('emailError', !email || !email.includes('@') ? 'Please enter a valid email address' : '');
-    return { content: [{ type: 'text', text: `Validation errors: ${errors.join('. ')}.` }] };
+    return `Validation errors: ${errors.join('. ')}.`;
   }
 
   // Clear errors
@@ -663,10 +631,7 @@ function setCheckoutInfo({ firstName, lastName, phone, email, leaveAtDoor, deliv
   document.getElementById('deliveryInstructions').value = orderState.delivery.instructions || '';
 
   const totals = calculateTotals();
-  return {
-    content: [{ type: 'text', text: `Checkout info saved for ${firstName} ${lastName}. Ready to place order. Total: $${totals.total.toFixed(2)}. Use place-order to complete.` }],
-    orderState: { ...getStateSnapshot(), contact: orderState.contact, delivery: orderState.delivery, checkout: totals }
-  };
+  return `Checkout info saved for ${firstName} ${lastName}. Ready to place order. Total: $${totals.total.toFixed(2)}. Use place-order to complete.`;
 }
 
 async function placeOrder(params, agent) {
@@ -675,7 +640,7 @@ async function placeOrder(params, agent) {
   const c = orderState.contact;
   if (!c.firstName || !c.lastName || !c.phone || !c.email) {
     showError('checkoutError', 'Please fill in all required contact fields');
-    return { content: [{ type: 'text', text: 'Error: Please fill in all required contact fields before placing order.' }] };
+    return 'Error: Please fill in all required contact fields before placing order.';
   }
   hideError('checkoutError');
 
@@ -695,12 +660,12 @@ async function placeOrder(params, agent) {
       });
     });
     if (!confirmed) {
-      return { content: [{ type: 'text', text: 'Order cancelled by user.' }] };
+      return 'Order cancelled by user.';
     }
   } else {
     // No agent — confirm via browser dialog
     const ok = confirm(`Place order for $${totals.total.toFixed(2)}?`);
-    if (!ok) return { content: [{ type: 'text', text: 'Order cancelled by user.' }] };
+    if (!ok) return 'Order cancelled by user.';
   }
 
   // Generate order number
@@ -713,10 +678,7 @@ async function placeOrder(params, agent) {
 
   goToStep(8);
 
-  return {
-    content: [{ type: 'text', text: `Order placed! Order ${orderNumber}. Estimated ${orderState.orderType}: ${orderState.store.deliveryEstimate}. Total charged: $${totals.total.toFixed(2)}.` }],
-    orderState: { ...getStateSnapshot(), confirmation: orderState.confirmation }
-  };
+  return `Order placed! Order ${orderNumber}. Estimated ${orderState.orderType}: ${orderState.store.deliveryEstimate}. Total charged: $${totals.total.toFixed(2)}.`;
 }
 
 // ============ STEP 8: CONFIRMATION ============

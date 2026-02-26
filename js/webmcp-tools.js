@@ -37,32 +37,80 @@ Use the product IDs from this response when calling create-order.`,
     },
     execute({ name }) {
       showAgentModal(name);
-      const menu = {
-        store: STORE,
-        products: PRODUCTS.map(p => {
-          const item = {
-            id: p.id,
-            category: p.category,
-            name: p.name,
-            description: p.description,
-            basePrice: p.basePrice,
-            calories: p.calories,
-            customizable: p.customizable
-          };
-          if (p.tag) item.tag = p.tag;
-          if (p.customizable) item.defaultToppings = p.defaultToppings || [];
-          return item;
-        }),
-        customizationOptions: {
-          sizes: SIZES.map(s => ({ id: s.id, name: s.name, priceModifier: s.priceModifier })),
-          crusts: CRUSTS.map(c => ({ id: c.id, name: c.name, priceModifier: c.priceModifier, default: c.default })),
-          toppings: TOPPINGS.map(t => ({ id: t.id, name: t.name, price: t.price }))
-        }
-      };
 
-      return {
-        content: [{ type: 'text', text: JSON.stringify(menu, null, 2) }]
-      };
+      const lines = [];
+
+      // Store info
+      lines.push(`# ${STORE.name}`);
+      lines.push('');
+      lines.push(`- **Address:** ${STORE.address}, ${STORE.city}, ${STORE.state} ${STORE.zip}`);
+      lines.push(`- **Phone:** ${STORE.phone}`);
+      lines.push(`- **Delivery Estimate:** ${STORE.deliveryEstimate}`);
+      lines.push(`- **Hours:**`);
+      lines.push(`  - Carryout: Sun–Thu ${STORE.hours.carryout.sunThu}, Fri–Sat ${STORE.hours.carryout.friSat}`);
+      lines.push(`  - Delivery: Sun–Thu ${STORE.hours.delivery.sunThu}, Fri–Sat ${STORE.hours.delivery.friSat}`);
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+      lines.push('## Menu');
+
+      // Products grouped by category
+      const categoryMap = {};
+      for (const p of PRODUCTS) {
+        if (!categoryMap[p.category]) categoryMap[p.category] = [];
+        categoryMap[p.category].push(p);
+      }
+
+      for (const cat of CATEGORIES) {
+        const items = categoryMap[cat.id];
+        if (!items || items.length === 0) continue;
+
+        lines.push('');
+        lines.push(`### ${cat.name}`);
+        lines.push('');
+
+        for (const p of items) {
+          const tag = p.tag ? ` \`${p.tag}\`` : '';
+          const emoji = p.emoji ? `${p.emoji} ` : '';
+          lines.push(`- ${emoji}**${p.name}**${tag}`);
+          lines.push(`  - *${p.description}*`);
+          lines.push(`  - **ID:** \`${p.id}\``);
+          lines.push(`  - **Base Price:** $${p.basePrice.toFixed(2)}`);
+          lines.push(`  - **Calories:** ${p.calories}`);
+          lines.push(`  - **Customizable:** ${p.customizable ? 'Yes' : 'No'}`);
+          if (p.customizable) {
+            const defaults = p.defaultToppings || [];
+            lines.push(`  - **Default Toppings:** ${defaults.length > 0 ? defaults.join(', ') : 'None'}`);
+          }
+        }
+      }
+
+      // Customization options
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+      lines.push('## Customization Options');
+      lines.push('');
+      lines.push('### Sizes');
+      for (const s of SIZES) {
+        const mod = s.priceModifier === 0 ? '$0.00'
+          : (s.priceModifier > 0 ? `+$${s.priceModifier.toFixed(2)}` : `−$${Math.abs(s.priceModifier).toFixed(2)}`);
+        lines.push(`- **${s.name}** — ${mod}`);
+      }
+      lines.push('');
+      lines.push('### Crusts');
+      for (const c of CRUSTS) {
+        const mod = c.priceModifier === 0 ? '$0.00' : `+$${c.priceModifier.toFixed(2)}`;
+        const def = c.default ? ' *(default)*' : '';
+        lines.push(`- **${c.name}** — ${mod}${def}`);
+      }
+      lines.push('');
+      lines.push('### Toppings ($1.50 each beyond defaults)');
+      for (const t of TOPPINGS) {
+        lines.push(`- ${t.name}`);
+      }
+
+      return lines.join('\n');
     }
   };
 }
@@ -133,11 +181,11 @@ This tool resets any existing order state and builds a fresh cart. The UI will u
     execute({ orderType, address, items }) {
       // Validate order type
       if (orderType === 'delivery' && !address) {
-        return { content: [{ type: 'text', text: 'Error: Delivery address is required for delivery orders.' }] };
+        return 'Error: Delivery address is required for delivery orders.';
       }
 
       if (!items || items.length === 0) {
-        return { content: [{ type: 'text', text: 'Error: At least one item is required.' }] };
+        return 'Error: At least one item is required.';
       }
 
       // Validate all products exist before mutating state
@@ -152,7 +200,7 @@ This tool resets any existing order state and builds a fresh cart. The UI will u
       });
 
       if (errors.length > 0) {
-        return { content: [{ type: 'text', text: `Error: ${errors.join(' ')}` }] };
+        return `Error: ${errors.join(' ')}`;
       }
 
       // Reset order state
@@ -229,29 +277,31 @@ This tool resets any existing order state and builds a fresh cart. The UI will u
       goToStep(7);
 
       const totals = calculateTotals();
-      const summary = [
-        `Order created (${orderType}${address ? ` to ${address}` : ''}).`,
-        ``,
-        `Items:`,
-        ...addedItems.map(s => `  • ${s}`),
-        ``,
-        `Subtotal: $${totals.subtotal.toFixed(2)}`,
-        totals.deliveryFee > 0 ? `Delivery Fee: $${totals.deliveryFee.toFixed(2)}` : null,
-        `Tax: $${totals.tax.toFixed(2)}`,
-        `Total: $${totals.total.toFixed(2)}`,
-        ``,
-        `Ready for checkout. Use the checkout tool to complete the order.`
-      ].filter(Boolean).join('\n');
+      const lines = [];
 
-      return {
-        content: [{ type: 'text', text: summary }],
-        orderState: {
-          orderType,
-          address,
-          cart: orderState.cart.map(ci => ({ name: ci.name, quantity: ci.quantity, price: ci.price })),
-          totals
-        }
-      };
+      lines.push(`# Order Created`);
+      lines.push('');
+      lines.push(`- **Type:** ${orderType}`);
+      if (address) lines.push(`- **Delivery Address:** ${address}`);
+      lines.push('');
+      lines.push('## Items');
+      lines.push('');
+      for (const s of addedItems) {
+        lines.push(`- ${s}`);
+      }
+      lines.push('');
+      lines.push('## Totals');
+      lines.push('');
+      lines.push(`- **Subtotal:** $${totals.subtotal.toFixed(2)}`);
+      if (totals.deliveryFee > 0) lines.push(`- **Delivery Fee:** $${totals.deliveryFee.toFixed(2)}`);
+      lines.push(`- **Tax:** $${totals.tax.toFixed(2)}`);
+      lines.push(`- **Total:** $${totals.total.toFixed(2)}`);
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+      lines.push('Ready for checkout. Use the **checkout** tool to complete the order.');
+
+      return lines.join('\n');
     }
   };
 }
@@ -298,7 +348,7 @@ The system will prompt the user for confirmation via a browser dialog before fin
     },
     async execute(params, agent) {
       if (orderState.cart.length === 0) {
-        return { content: [{ type: 'text', text: 'Error: Cart is empty. Call create-order first.' }] };
+        return 'Error: Cart is empty. Call create-order first.';
       }
 
       // Navigate to checkout and set info
