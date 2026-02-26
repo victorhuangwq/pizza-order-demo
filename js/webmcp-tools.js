@@ -372,8 +372,9 @@ All fields are optional — include only the changes you need to make. Operation
         }
       }
 
-      // Re-render cart
-      renderCart();
+      // Re-render current view
+      if (currentStep === 6) renderCart();
+      if (currentStep === 7) renderCheckout();
       updateCartBadge();
 
       const lines = [];
