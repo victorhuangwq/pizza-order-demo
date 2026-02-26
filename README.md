@@ -1,6 +1,6 @@
 # Pizza Order Demo (Imperative WebMCP Implementation)
 
-A demo site implementing the [imperative version of WebMCP](https://github.com/webmachinelearning/webmcp), a browser API that enables AI agents to discover and interact with tools exposed by web pages. This example demonstrates a 7-step pizza ordering wizard where tools are dynamically registered based on each step of the user journey.
+A demo site implementing the [imperative version of WebMCP](https://github.com/webmachinelearning/webmcp), a browser API that enables AI agents to discover and interact with tools exposed by web pages. This example demonstrates a pizza ordering flow where three agentic tools (`browse`, `create-order`, `checkout`) let an AI agent build a complete order in just a few calls.
 
 ![Pizza Order Demo](image.png)
 
@@ -17,7 +17,7 @@ To test this demo with a real WebMCP implementation:
 1. **Read the setup guide:** [WebMCP Chrome Blog Post](https://developer.chrome.com/blog/webmcp-epp)
 2. **Follow the setup steps:** [WebMCP Setup Instructions](https://docs.google.com/document/d/1rtU1fRPS0bMqd9abMG_hc6K9OAI6soUy3Kh00toAgyk/edit?tab=t.0)
 3. **Open the live demo** in your configured Chrome browser, with the developer extension installed.
-4. The site will automatically register tools for each step of the ordering process
+4. The site will automatically register its WebMCP tools (`browse`, `create-order`, `checkout`)
 
 ### Browser Compatibility
 
@@ -28,17 +28,15 @@ To test this demo with a real WebMCP implementation:
 
 ## How It Works
 
-This site is a multi-step pizza ordering wizard. At each step, it dynamically registers a different set of tools using `navigator.modelContext.provideContext({ tools })`. An AI agent navigating the site sees only the tools relevant to the current step, enabling a natural, context-aware interaction pattern.
+The site exposes three high-level WebMCP tools via `navigator.modelContext.provideContext({ tools })`. An AI agent can complete an entire order in as few as three tool calls:
 
-| Step | Description | Tools |
-|------|-------------|-------|
-| 1 | Select order type | `select-order-type` |
-| 2 | Enter delivery address | `set-delivery-address`, `confirm-location` |
-| 3 | Choose menu category | `select-category` |
-| 4 | Pick a pizza | `select-pizza` |
-| 5 | Customize pizza | `customize-pizza`, `add-to-cart` |
-| 6 | Review cart | `update-cart-item`, `add-side`, `proceed-to-checkout` |
-| 7 | Checkout | `set-checkout-info`, `place-order` |
+| Tool | Purpose |
+|------|---------|
+| `browse` | Returns the full menu (products, sizes, crusts, toppings, pricing rules) as structured JSON. Shows an agent-working modal to the user. |
+| `create-order` | Accepts order type, address, and an array of items (with optional pizza customization). Builds a cart and navigates to checkout in one call. |
+| `checkout` | Collects customer contact info, prompts the user for confirmation, and places the order. |
+
+`browse` and `create-order` are always registered. `checkout` becomes available once the cart is populated and the UI reaches the checkout step.
 
 ## Local Development
 
@@ -60,8 +58,8 @@ Then open **http://localhost:3000** in your browser.
 │   └── style.css          # Styling
 ├── js/
 │   ├── app.js             # Wizard logic and state management
-│   ├── menu-data.js       # Menu catalog data
-│   ├── webmcp-tools.js    # Tool definitions per step
+│   ├── menu-data.js       # Unified product catalog & customization options
+│   ├── webmcp-tools.js    # WebMCP tool definitions (browse, create-order, checkout)
 │   └── webmcp-shim.js     # Polyfill for local testing
 ├── server.js              # Local dev server
 └── package.json
@@ -76,9 +74,9 @@ For local testing without a WebMCP implementation, this site includes a polyfill
 Open the browser console and try:
 
 ```javascript
-mcp.help()                    // List available tools for current step
-mcp.help('select-order-type') // Details for a specific tool
-mcp.call('select-order-type', { type: 'delivery' })  // Execute a tool
+mcp.help()                    // List available tools
+mcp.help('browse')            // Details for a specific tool
+mcp.call('browse', { name: 'TestAgent' })  // Execute a tool
 ```
 
 ### Deployment
