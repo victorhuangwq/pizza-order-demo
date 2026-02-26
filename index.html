@@ -164,7 +164,7 @@
     <div class="pizza-list-page">
       <button class="back-to-menu" onclick="goToStep(3)">‹ Back to Menu</button>
       <h1 class="section-headline" id="categoryTitle">SPECIALTY PIZZAS</h1>
-      <div class="pizza-grid" id="pizzaGrid">
+      <div class="pizza-grid" id="productGrid">
         <!-- Populated by JS -->
       </div>
     </div>
@@ -382,6 +382,14 @@
       </div>
     </div>
   </section>
+
+  <!-- Agent modal overlay -->
+  <div id="agentModal" class="agent-modal-overlay" style="display:none;">
+    <div class="agent-modal">
+      <div class="agent-modal-spinner"></div>
+      <p class="agent-modal-text" id="agentModalText"></p>
+    </div>
+  </div>
 
   <!-- Scripts -->
   <script src="js/menu-data.js"></script>

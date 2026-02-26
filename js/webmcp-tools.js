@@ -1,568 +1,495 @@
-// webmcp-tools.js — WebMCP tool definitions per step
-// Uses navigator.modelContext.provideContext() to swap tools at each step transition.
+// webmcp-tools.js — WebMCP tool definitions for Checkers Pizza
+// Exposes three agentic tools: browse, create-order, checkout.
+// These are always registered — no per-step swapping needed.
 
-/**
- * PIZZA ORDERING FLOW - 7 STEPS
- *
- * Step 1: Order Type → select-order-type
- * Step 2: Location → set-delivery-address, confirm-location
- * Step 3: Menu → select-category + get-menu-categories
- * Step 4: Pizza → select-pizza + get-available-pizzas
- * Step 5: Customize → customize-pizza, add-to-cart + get-available-pizzas, get-available-toppings
- * Step 6: Cart → update-cart-item, add-side, proceed-to-checkout
- * Step 7: Checkout → set-checkout-info, place-order
- *
- * GETTER TOOLS (read-only, available at relevant steps):
- * - get-menu-categories: Available at Step 3
- * - get-available-pizzas: Available at Steps 4-5
- * - get-available-toppings: Available at Step 5
- */
+// ============ TOOL: browse ============
 
-// ============ GETTER TOOLS (READ-ONLY) ============
-
-/**
- * Get available menu categories
- */
-function createGetMenuCategoriesTool() {
+function createBrowseTool() {
   return {
-    name: 'get-menu-categories',
-    description: 'Get all available menu categories with descriptions. Use this to understand what\'s available to order.',
+    name: 'browse',
+    description: `Begin an ordering session on behalf of the user. Shows a status indicator so the human knows an agent is working, then returns the full Checkers Pizza menu as structured JSON.
+
+Includes:
+• Store information (location, hours, delivery estimate)
+• All products organized by category, with IDs, descriptions, pricing, and calorie info
+• Customizable products (pizzas) include defaultToppings — the toppings that come standard
+• Size, crust, and topping options with price modifiers (apply only to customizable products)
+
+PRICING RULES:
+• Customizable products (pizzas): price = basePrice + size modifier + crust modifier + (extra toppings beyond defaults × $1.50 each)
+  - Sizes: small (-$3.00), medium ($0), large (+$4.00)
+  - Crusts: hand-tossed ($0), handmade-pan (+$1.00), thin ($0), brooklyn ($0)
+  - Extra toppings: $1.50 each beyond the pizza's default toppings
+• Non-customizable products: price = basePrice
+• Delivery fee: $5.99 (delivery orders only)
+• Tax: 9.5% on subtotal + delivery fee
+
+Use the product IDs from this response when calling create-order.`,
     inputSchema: {
       type: 'object',
-      properties: {}
-    },
-    execute() {
-      const categories = [
-        { id: 'build-your-own', name: 'Build Your Own', description: 'Create a custom pizza from scratch. Start with cheese and add any toppings you like.', implemented: true, itemTypes: ['pizza'] },
-        { id: 'specialty', name: 'Specialty Pizzas', description: 'Pre-designed signature pizzas with unique topping combinations. Our most popular selection.', implemented: true, itemTypes: ['pizza'] },
-        { id: 'breads', name: 'Breads & Sides', description: 'Breadsticks, cheesy bread, garlic bread, and other sides. Add to your order in the cart.', implemented: false, itemTypes: ['side'], note: 'Add sides from the cart (Step 6)' },
-        { id: 'chicken', name: 'Chicken', description: 'Wings, boneless chicken bites, and chicken tenders.', implemented: false, itemTypes: ['side'], note: 'Add sides from the cart (Step 6)' },
-        { id: 'desserts', name: 'Desserts', description: 'Cinnamon bread twists, lava cakes, brownies, and other sweet treats.', implemented: false, itemTypes: ['side'], note: 'Add sides from the cart (Step 6)' },
-        { id: 'pastas', name: 'Pastas', description: 'Pasta dishes, pasta bowls, and other pasta options.', implemented: false, itemTypes: ['side'], note: 'Add sides from the cart (Step 6)' },
-        { id: 'sandwiches', name: 'Sandwiches', description: 'Oven-baked sandwiches with various fillings.', implemented: false, itemTypes: ['side'], note: 'Add sides from the cart (Step 6)' },
-        { id: 'salads', name: 'Salads', description: 'Garden salads, caesar salads, and other fresh salad options.', implemented: false, itemTypes: ['side'], note: 'Add sides from the cart (Step 6)' },
-        { id: 'drinks', name: 'Drinks', description: 'Sodas, juices, bottled water, and other beverages.', implemented: false, itemTypes: ['side'], note: 'Add sides from the cart (Step 6)' },
-        { id: 'loaded-tots', name: 'Loaded Tots', description: 'Tater tots with various toppings and sauces.', implemented: false, itemTypes: ['side'], note: 'Add sides from the cart (Step 6)' },
-        { id: 'extras', name: 'Extras', description: 'Dipping sauces, plates, utensils, and other extras.', implemented: false, itemTypes: ['side'], note: 'Add sides from the cart (Step 6)' }
-      ];
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({ categories }, null, 2)
-        }],
-        orderState: getOrderStateSnapshot()
-      };
-    }
-  };
-}
-
-/**
- * Get all available pizzas with descriptions and toppings
- */
-function createGetAvailablePizzasTool() {
-  return {
-    name: 'get-available-pizzas',
-    description: 'Get detailed information about all available pizzas including default toppings, descriptions, and pricing. Use this to understand pizza options.',
-    inputSchema: {
-      type: 'object',
-      properties: {}
-    },
-    execute() {
-      const pizzas = PIZZAS.map(pizza => ({
-        id: pizza.id,
-        name: pizza.name,
-        description: pizza.description,
-        category: pizza.category || 'specialty',
-        defaultToppings: pizza.defaultToppings || [],
-        pricing: {
-          small: pizza.price || 9.99,
-          medium: (pizza.price || 11.99),
-          large: (pizza.price || 13.99)
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Display name of the client agent (shown to the user while the order is being prepared).'
         }
-      }));
+      },
+      required: ['name']
+    },
+    execute({ name }) {
+      showAgentModal(name);
 
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({ pizzas }, null, 2)
-        }],
-        orderState: getOrderStateSnapshot()
-      };
+      const lines = [];
+
+      // Store info
+      lines.push(`# ${STORE.name}`);
+      lines.push('');
+      lines.push(`- **Address:** ${STORE.address}, ${STORE.city}, ${STORE.state} ${STORE.zip}`);
+      lines.push(`- **Phone:** ${STORE.phone}`);
+      lines.push(`- **Delivery Estimate:** ${STORE.deliveryEstimate}`);
+      lines.push(`- **Hours:**`);
+      lines.push(`  - Carryout: Sun–Thu ${STORE.hours.carryout.sunThu}, Fri–Sat ${STORE.hours.carryout.friSat}`);
+      lines.push(`  - Delivery: Sun–Thu ${STORE.hours.delivery.sunThu}, Fri–Sat ${STORE.hours.delivery.friSat}`);
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+      lines.push('## Menu');
+
+      // Products grouped by category
+      const categoryMap = {};
+      for (const p of PRODUCTS) {
+        if (!categoryMap[p.category]) categoryMap[p.category] = [];
+        categoryMap[p.category].push(p);
+      }
+
+      for (const cat of CATEGORIES) {
+        const items = categoryMap[cat.id];
+        if (!items || items.length === 0) continue;
+
+        lines.push('');
+        lines.push(`### ${cat.name}`);
+        lines.push('');
+
+        for (const p of items) {
+          const tag = p.tag ? ` \`${p.tag}\`` : '';
+          const emoji = p.emoji ? `${p.emoji} ` : '';
+          lines.push(`- ${emoji}**${p.name}**${tag}`);
+          lines.push(`  - *${p.description}*`);
+          lines.push(`  - **ID:** \`${p.id}\``);
+          lines.push(`  - **Base Price:** $${p.basePrice.toFixed(2)}`);
+          lines.push(`  - **Calories:** ${p.calories}`);
+          lines.push(`  - **Customizable:** ${p.customizable ? 'Yes' : 'No'}`);
+          if (p.customizable) {
+            const defaults = p.defaultToppings || [];
+            lines.push(`  - **Default Toppings:** ${defaults.length > 0 ? defaults.join(', ') : 'None'}`);
+          }
+        }
+      }
+
+      // Customization options
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+      lines.push('## Customization Options');
+      lines.push('');
+      lines.push('### Sizes');
+      for (const s of SIZES) {
+        const mod = s.priceModifier === 0 ? '$0.00'
+          : (s.priceModifier > 0 ? `+$${s.priceModifier.toFixed(2)}` : `−$${Math.abs(s.priceModifier).toFixed(2)}`);
+        lines.push(`- **${s.name}** — ${mod}`);
+      }
+      lines.push('');
+      lines.push('### Crusts');
+      for (const c of CRUSTS) {
+        const mod = c.priceModifier === 0 ? '$0.00' : `+$${c.priceModifier.toFixed(2)}`;
+        const def = c.default ? ' *(default)*' : '';
+        lines.push(`- **${c.name}** — ${mod}${def}`);
+      }
+      lines.push('');
+      lines.push('### Toppings ($1.50 each beyond defaults)');
+      for (const t of TOPPINGS) {
+        lines.push(`- ${t.name}`);
+      }
+
+      return lines.join('\n');
     }
   };
 }
 
-/**
- * Get all available toppings with descriptions
- */
-function createGetAvailableToppingsTool() {
+// ============ TOOL: create-order ============
+
+function createCreateOrderTool() {
   return {
-    name: 'get-available-toppings',
-    description: 'Get all available toppings with descriptions and categories. Use this when customizing a pizza.',
+    name: 'create-order',
+    description: `Create a new order with the specified items in a single call.
+
+Accepts an order type, delivery address, and an array of items to add to the cart. Each item references a product ID from the menu (call browse first to see available IDs).
+
+For customizable products (pizzas), you can optionally specify size, crust, and toppings. Omitted fields use defaults (medium, hand-tossed, the pizza's default toppings).
+
+For non-customizable products (sides, drinks, etc.), only productId and quantity are needed.
+
+This tool resets any existing order state and builds a fresh cart. The UI will update to show the populated cart.
+
+Returns the cart state with unique IDs for each item. Use these IDs with update-order to modify the order.`,
     inputSchema: {
       type: 'object',
-      properties: {}
+      properties: {
+        orderType: {
+          type: 'string',
+          enum: ['delivery', 'carryout'],
+          description: 'Delivery or carryout.'
+        },
+        address: {
+          type: 'string',
+          description: 'Delivery address (required for delivery orders).'
+        },
+        items: {
+          type: 'array',
+          description: 'Array of items to add to the cart.',
+          items: {
+            type: 'object',
+            properties: {
+              productId: {
+                type: 'string',
+                description: 'Product ID from the menu (e.g. "pepperoni", "wings-8pc", "coca-cola").'
+              },
+              quantity: {
+                type: 'integer',
+                minimum: 1,
+                description: 'How many of this item. Default: 1.'
+              },
+              size: {
+                type: 'string',
+                enum: ['small', 'medium', 'large'],
+                description: 'Size for customizable products. Default: medium.'
+              },
+              crust: {
+                type: 'string',
+                enum: ['hand-tossed', 'handmade-pan', 'thin', 'brooklyn'],
+                description: 'Crust for customizable products. Default: hand-tossed.'
+              },
+              toppings: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Topping IDs for customizable products. Replaces default toppings. Omit to keep defaults.'
+              }
+            },
+            required: ['productId']
+          }
+        }
+      },
+      required: ['orderType', 'items']
     },
-    execute() {
-      const toppings = TOPPINGS.map(topping => ({
-        id: topping.id,
-        name: topping.name || topping.id,
-        description: `${topping.id} topping`,
-        category: categorizeTopping(topping.id),
-        price: 1.50
-      }));
+    execute({ orderType, address, items }) {
+      // Validate order type
+      if (orderType === 'delivery' && !address) {
+        return 'Error: Delivery address is required for delivery orders.';
+      }
 
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({ toppings }, null, 2)
-        }],
-        orderState: getOrderStateSnapshot()
-      };
+      if (!items || items.length === 0) {
+        return 'Error: At least one item is required.';
+      }
+
+      // Validate all products exist before mutating state
+      const errors = [];
+      for (let i = 0; i < items.length; i++) {
+        const product = getProductById(items[i].productId);
+        if (!product) {
+          errors.push(`Item ${i}: product "${items[i].productId}" not found.`);
+        }
+      }
+
+      if (errors.length > 0) {
+        return `Error: ${errors.join(' ')}`;
+      }
+
+      // Reset order state
+      startNewOrder();
+
+      // Set order type and address
+      selectOrderType(orderType);
+      if (address) {
+        setDeliveryAddress(address);
+      }
+      confirmLocation('now');
+
+      // Add each item to the cart
+      for (const item of items) {
+        addItemToCartFromSpec(item);
+      }
+
+      // Clear agent modal and navigate to checkout
+      hideAgentModal();
+      goToStep(7);
+
+      const lines = [];
+      lines.push('# Order Created');
+      lines.push('');
+      lines.push(`- **Type:** ${orderType}`);
+      if (address) lines.push(`- **Delivery Address:** ${address}`);
+      lines.push('');
+      lines.push(generateCartMarkdown());
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+      lines.push('Ready for checkout. Use **update-order** to modify or **checkout** to complete the order.');
+
+      return lines.join('\n');
     }
   };
 }
 
-// Helper to categorize toppings
-function categorizeTopping(toppingId) {
-  const meatToppings = ['pepperoni', 'italian-sausage', 'beef', 'ham', 'bacon', 'chicken'];
-  const veggieToppings = ['mushrooms', 'onions', 'green-peppers', 'black-olives', 'jalapenos', 'tomatoes'];
+// ============ TOOL: update-order ============
 
-  if (meatToppings.includes(toppingId)) return 'meat';
-  if (veggieToppings.includes(toppingId)) return 'veggie';
-  return 'other';
-}
-
-// Helper to get available actions based on current step
-function getAvailableActions() {
-  const step = window.currentStep || 1;
-  switch (step) {
-    case 1: return ['select-order-type'];
-    case 2: return ['set-delivery-address', 'confirm-location'];
-    case 3: return ['select-category'];
-    case 4: return ['select-pizza'];
-    case 5: return ['customize-pizza', 'add-to-cart'];
-    case 6: return ['update-cart-item', 'add-side', 'proceed-to-checkout'];
-    case 7: return ['set-checkout-info', 'place-order'];
-    default: return [];
-  }
-}
-
-// Helper to get order state snapshot (for tool responses)
-function getOrderStateSnapshot() {
+function createUpdateOrderTool() {
   return {
-    orderType: orderState.orderType,
-    address: orderState.address,
-    timing: orderState.timing,
-    cart: orderState.cart
+    name: 'update-order',
+    description: `Modify an existing order by adding new products, removing products, or changing quantities.
+
+Use the cart IDs returned by create-order or a previous update-order call to reference items. Each cart item has a unique 8-character hex ID.
+
+All fields are optional — include only the changes you need to make. Operations are applied in order: removals first, then quantity changes, then additions.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        add: {
+          type: 'array',
+          description: 'New products to add to the cart.',
+          items: {
+            type: 'object',
+            properties: {
+              productId: {
+                type: 'string',
+                description: 'Product ID from the menu (e.g. "pepperoni", "wings-8pc", "coca-cola").'
+              },
+              quantity: {
+                type: 'integer',
+                minimum: 1,
+                description: 'How many of this item. Default: 1.'
+              },
+              size: {
+                type: 'string',
+                enum: ['small', 'medium', 'large'],
+                description: 'Size for customizable products. Default: medium.'
+              },
+              crust: {
+                type: 'string',
+                enum: ['hand-tossed', 'handmade-pan', 'thin', 'brooklyn'],
+                description: 'Crust for customizable products. Default: hand-tossed.'
+              },
+              toppings: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Topping IDs for customizable products. Replaces default toppings. Omit to keep defaults.'
+              }
+            },
+            required: ['productId']
+          }
+        },
+        remove: {
+          type: 'array',
+          description: 'Cart IDs of items to remove.',
+          items: { type: 'string' }
+        },
+        changeQuantity: {
+          type: 'array',
+          description: 'Change quantity for existing cart items.',
+          items: {
+            type: 'object',
+            properties: {
+              cartId: {
+                type: 'string',
+                description: 'The 8-character hex cart ID of the item to update.'
+              },
+              quantity: {
+                type: 'integer',
+                minimum: 1,
+                description: 'New quantity for the item.'
+              }
+            },
+            required: ['cartId', 'quantity']
+          }
+        }
+      }
+    },
+    execute({ add, remove, changeQuantity }) {
+      if (orderState.cart.length === 0 && (!add || add.length === 0)) {
+        return 'Error: Cart is empty and no items to add. Use create-order to build an order first.';
+      }
+
+      const changes = [];
+      const errors = [];
+
+      // 1. Remove items
+      if (remove && remove.length > 0) {
+        for (const cartId of remove) {
+          const idx = orderState.cart.findIndex(item => item.cartId === cartId);
+          if (idx === -1) {
+            errors.push(`Cart ID "${cartId}" not found.`);
+          } else {
+            const item = orderState.cart[idx];
+            changes.push(`Removed ${item.name} (\`${cartId}\`)`);
+            orderState.cart.splice(idx, 1);
+          }
+        }
+      }
+
+      // 2. Change quantities
+      if (changeQuantity && changeQuantity.length > 0) {
+        for (const { cartId, quantity } of changeQuantity) {
+          const item = orderState.cart.find(i => i.cartId === cartId);
+          if (!item) {
+            errors.push(`Cart ID "${cartId}" not found.`);
+          } else {
+            const oldQty = item.quantity;
+            item.quantity = quantity;
+            item.price = item.unitPrice * quantity;
+            changes.push(`Changed ${item.name} (\`${cartId}\`) quantity: ${oldQty} → ${quantity}`);
+          }
+        }
+      }
+
+      // 3. Add new items
+      if (add && add.length > 0) {
+        // Validate all products first
+        const addErrors = [];
+        for (let i = 0; i < add.length; i++) {
+          if (!getProductById(add[i].productId)) {
+            addErrors.push(`Product "${add[i].productId}" not found.`);
+          }
+        }
+        if (addErrors.length > 0) {
+          errors.push(...addErrors);
+        } else {
+          for (const itemSpec of add) {
+            const result = addItemToCartFromSpec(itemSpec);
+            if (result.success) {
+              changes.push(`Added ${result.description} (\`${result.cartId}\`)`);
+            } else {
+              errors.push(result.error);
+            }
+          }
+        }
+      }
+
+      // Re-render current view
+      if (currentStep === 6) renderCart();
+      if (currentStep === 7) renderCheckout();
+      updateCartBadge();
+
+      const lines = [];
+      lines.push('# Order Updated');
+      lines.push('');
+
+      if (errors.length > 0) {
+        lines.push('## Errors');
+        lines.push('');
+        for (const e of errors) {
+          lines.push(`- ${e}`);
+        }
+        lines.push('');
+      }
+
+      if (changes.length > 0) {
+        lines.push('## Changes');
+        lines.push('');
+        for (const c of changes) {
+          lines.push(`- ${c}`);
+        }
+        lines.push('');
+      }
+
+      lines.push(generateCartMarkdown());
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+      lines.push('Use **update-order** to make more changes or **checkout** to complete.');
+
+      return lines.join('\n');
+    }
   };
 }
 
-// Helper to calculate cart totals (mirrors app.js logic)
-function getCartTotals() {
-  if (typeof window.calculateTotals === 'function') {
-    return window.calculateTotals();
-  }
+// ============ TOOL: checkout ============
 
-  // Fallback if app.js hasn't loaded yet
-  const subtotal = orderState.cart.reduce((sum, item) => sum + item.price, 0);
-  const deliveryFee = orderState.orderType === 'delivery' ? 5.99 : 0;
-  const tax = Math.round((subtotal + deliveryFee) * 0.08 * 100) / 100;
-  const total = Math.round((subtotal + deliveryFee + tax) * 100) / 100;
-  return { subtotal, deliveryFee, tax, total };
+function createCheckoutTool() {
+  return {
+    name: 'checkout',
+    description: `Complete the order by providing customer contact info and delivery preferences.
+
+PREREQUISITE: Call create-order first to populate the cart.
+
+The system will prompt the user for confirmation via a browser dialog before finalizing the order.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        firstName: {
+          type: 'string',
+          description: 'Customer first name.'
+        },
+        lastName: {
+          type: 'string',
+          description: 'Customer last name.'
+        },
+        phone: {
+          type: 'string',
+          description: 'Phone number (10 digits).'
+        },
+        email: {
+          type: 'string',
+          description: 'Email address for order confirmation.'
+        },
+        leaveAtDoor: {
+          type: 'boolean',
+          description: 'Leave order at door without contact. Default: false.'
+        },
+        deliveryInstructions: {
+          type: 'string',
+          description: 'Special delivery instructions (e.g. "Gate code: 1234"). Optional.'
+        }
+      },
+      required: ['firstName', 'lastName', 'phone', 'email']
+    },
+    async execute(params, agent) {
+      if (orderState.cart.length === 0) {
+        return 'Error: Cart is empty. Call create-order first.';
+      }
+
+      // Navigate to checkout and set info
+      proceedToCheckout();
+      const infoResult = setCheckoutInfo(params);
+
+      // If setCheckoutInfo returned a validation error, surface it
+      if (infoResult.content && infoResult.content[0] && infoResult.content[0].text.startsWith('Validation')) {
+        return infoResult;
+      }
+
+      // Place the order (may prompt user for confirmation)
+      return placeOrder(params, agent);
+    }
+  };
 }
+
+// ============ REGISTRATION ============
 
 function registerToolsForStep(step) {
   if (!('modelContext' in navigator)) return;
 
-  const tools = getToolsForStep(step);
-  navigator.modelContext.provideContext({ tools });
-}
+  // browse and create-order are always available.
+  // update-order is available once the cart is populated.
+  // checkout is only offered once the cart is populated and we're at checkout.
+  const tools = [
+    createBrowseTool(),
+    createCreateOrderTool()
+  ];
 
-function getToolsForStep(step) {
-  const tools = [];
-
-  switch (step) {
-    case 1:
-      tools.push(...getStep1Tools());
-      break;
-    case 2:
-      tools.push(...getStep2Tools());
-      break;
-    case 3:
-      tools.push(createGetMenuCategoriesTool());
-      tools.push(...getStep3Tools());
-      break;
-    case 4:
-      tools.push(createGetAvailablePizzasTool());
-      tools.push(...getStep4Tools());
-      break;
-    case 5:
-      tools.push(createGetAvailablePizzasTool());
-      tools.push(createGetAvailableToppingsTool());
-      tools.push(...getStep5Tools());
-      break;
-    case 6:
-      tools.push(...getStep6Tools());
-      break;
-    case 7:
-      tools.push(...getStep7Tools());
-      break;
+  if (orderState.cart.length > 0) {
+    tools.push(createUpdateOrderTool());
   }
 
-  return tools;
-}
+  if (step >= 7 && orderState.cart.length > 0) {
+    tools.push(createCheckoutTool());
+  }
 
-// ============ STEP 1: ORDER TYPE ============
-function getStep1Tools() {
-  return [
-    {
-      name: 'select-order-type',
-      description: `Select the order type for this pizza order.
-
-Choose one:
-• 'delivery': Pizza will be delivered to you (delivery fees apply)
-• 'carryout': You'll pick up the order at the store
-
-NEXT: Proceed to set delivery address or confirm location.`,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          type: {
-            type: 'string',
-            enum: ['delivery', 'carryout'],
-            description: 'The order type: "delivery" or "carryout".'
-          }
-        },
-        required: ['type']
-      },
-      execute({ type }) {
-        return selectOrderType(type);
-      }
-    }
-  ];
-}
-
-// ============ STEP 2: LOCATION ============
-function getStep2Tools() {
-  return [
-    {
-      name: 'set-delivery-address',
-      description: `Set the delivery address and find the nearest store.
-
-INPUT: Complete address including street, city, state, ZIP.
-Example: "1 Microsoft Way, Redmond, WA 98052"
-
-The system will validate the address and locate the nearest store.
-
-NEXT: Call 'confirm-location' to proceed to the menu.`,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          address: {
-            type: 'string',
-            description: 'The full delivery address (e.g., "1 Microsoft Way, Building 9, Redmond, WA 98052")'
-          }
-        },
-        required: ['address']
-      },
-      execute({ address }) {
-        return setDeliveryAddress(address);
-      }
-    },
-    {
-      name: 'confirm-location',
-      description: `Confirm the delivery location and order timing, then proceed to the menu.
-
-PARAMETERS:
-• timing (optional): 'now' (default - prepare immediately) or 'later' (schedule for ~1 hour from now)
-
-PREREQUISITE: Must call 'set-delivery-address' first to set an address.
-
-NEXT: Proceed to menu categories.`,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          timing: {
-            type: 'string',
-            enum: ['now', 'later'],
-            description: 'When to prepare the order. Default: "now".'
-          }
-        }
-      },
-      execute({ timing } = {}) {
-        return confirmLocation(timing);
-      }
-    }
-  ];
-}
-
-// ============ STEP 3: MENU CATEGORIES ============
-function getStep3Tools() {
-  return [
-    {
-      name: 'select-category',
-      description: `Select a menu category to browse items.
-
-For pizza orders: Choose 'build-your-own' or 'specialty'
-For sides/drinks: These can be added later in the cart
-
-Use 'get-menu-categories' tool to see detailed descriptions of all categories.
-
-NEXT: Proceed to pizza selection.`,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          category: {
-            type: 'string',
-            enum: ['build-your-own', 'specialty', 'breads', 'loaded-tots', 'chicken', 'desserts', 'pastas', 'sandwiches', 'salads', 'drinks', 'extras'],
-            description: 'The menu category ID to browse.'
-          }
-        },
-        required: ['category']
-      },
-      execute({ category }) {
-        return selectCategory(category);
-      }
-    }
-  ];
-}
-
-// ============ STEP 4: PIZZA SELECTION ============
-function getStep4Tools() {
-  return [
-    {
-      name: 'select-pizza',
-      description: `Select a pizza to customize.
-
-Use 'get-available-pizzas' tool to see all options with descriptions and default toppings.
-
-Quick reference:
-• Classics: pepperoni, cheese
-• Specialty: meatzza, extravaganzza, veggie, bbq-chicken, spicy-bacon, hawaiian
-
-NEXT: Proceed to customize pizza to modify size, crust, toppings, and quantity.`,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          pizzaId: {
-            type: 'string',
-            description: 'The ID of the pizza to select (e.g., "pepperoni", "cheese", "meatzza").'
-          }
-        },
-        required: ['pizzaId']
-      },
-      execute({ pizzaId }) {
-        return selectPizza(pizzaId);
-      }
-    }
-  ];
-}
-
-// ============ STEP 5: CUSTOMIZE PIZZA ============
-function getStep5Tools() {
-  return [
-    {
-      name: 'customize-pizza',
-      description: `Customize the selected pizza. All parameters optional - omitted fields keep current values.
-
-PARAMETERS:
-• size: 'small' (10"), 'medium' (12"), 'large' (14")
-• crust: 'hand-tossed' (default), 'handmade-pan' (+$1), 'thin', 'brooklyn'
-• toppings: ARRAY of topping IDs - completely replaces current toppings
-  Use 'get-available-toppings' for full list.
-  Example: ['pepperoni', 'mushrooms'] sets exactly these 2 toppings
-  To remove all: pass empty array []
-• quantity: Number of this pizza to add (default: 1)
-
-NEXT: Call 'add-to-cart' to add this pizza to your order.`,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          size: {
-            type: 'string',
-            enum: ['small', 'medium', 'large'],
-            description: 'Pizza size. small=10", medium=12" (default), large=14".'
-          },
-          crust: {
-            type: 'string',
-            enum: ['hand-tossed', 'handmade-pan', 'thin', 'brooklyn'],
-            description: 'Crust type. Default: hand-tossed. Handmade pan is +$1.'
-          },
-          toppings: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Array of topping IDs. This REPLACES all current toppings. Extra toppings beyond pizza defaults are +$1.50 each.'
-          },
-          quantity: {
-            type: 'integer',
-            minimum: 1,
-            description: 'Number of this pizza to order. Default: 1.'
-          }
-        }
-      },
-      execute(params) {
-        return customizePizza(params);
-      }
-    },
-    {
-      name: 'add-to-cart',
-      description: `Add the customized pizza to the cart.
-
-NEXT: Proceed to review cart, add sides, or checkout.`,
-      inputSchema: {
-        type: 'object',
-        properties: {}
-      },
-      execute() {
-        return addToCart();
-      }
-    }
-  ];
-}
-
-// ============ STEP 6: CART ============
-function getStep6Tools() {
-  return [
-    {
-      name: 'update-cart-item',
-      description: 'Update the quantity of a cart item, or remove it by setting quantity to 0.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          itemIndex: {
-            type: 'integer',
-            description: 'The 0-based index of the cart item to update (first item is 0, second is 1, etc.).'
-          },
-          quantity: {
-            type: 'integer',
-            minimum: 0,
-            description: 'New quantity. Set to 0 to remove the item.'
-          }
-        },
-        required: ['itemIndex']
-      },
-      execute(params) {
-        return updateCartItem(params);
-      }
-    },
-    {
-      name: 'add-side',
-      description: `Add a side item to the cart. Can be called multiple times to add different sides.
-
-AVAILABLE SIDES:
-• 'bread-bites': Seasoned bite-sized bread pieces ($6.99)
-• 'cheesy-bread': Breadsticks topped with cheese ($7.99)
-• 'wings-8pc': 8 chicken wings with sauce choice ($9.99)
-• 'loaded-tots': Tater tots with cheese and toppings ($6.99)
-• 'mac-cheese': Creamy macaroni and cheese ($7.99)`,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          sideId: {
-            type: 'string',
-            description: 'The ID of the side item (e.g., "bread-bites", "cheesy-bread", "wings-8pc").'
-          },
-          quantity: {
-            type: 'integer',
-            minimum: 1,
-            description: 'Number to add. Default: 1.'
-          }
-        },
-        required: ['sideId']
-      },
-      execute({ sideId, quantity }) {
-        return addSide(sideId, quantity || 1);
-      }
-    },
-    {
-      name: 'proceed-to-checkout',
-      description: `Proceed from cart to checkout.
-
-PREREQUISITE: Cart must have at least one item.
-
-NEXT: You'll enter contact info and place the order.`,
-      inputSchema: {
-        type: 'object',
-        properties: {}
-      },
-      execute() {
-        return proceedToCheckout();
-      }
-    }
-  ];
-}
-
-// ============ STEP 7: CHECKOUT ============
-function getStep7Tools() {
-  return [
-    {
-      name: 'set-checkout-info',
-      description: `Set customer contact information and delivery preferences.
-
-REQUIRED FIELDS:
-• firstName: Customer's first name
-• lastName: Customer's last name
-• phone: 10-digit phone number
-• email: Valid email for order confirmation
-
-OPTIONAL FIELDS:
-• leaveAtDoor: true/false - leave at door without contact
-• deliveryInstructions: Special instructions (e.g., "Gate code: 1234")
-
-NEXT: Call 'place-order' to finalize the order.`,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          firstName: {
-            type: 'string',
-            description: 'Customer first name.'
-          },
-          lastName: {
-            type: 'string',
-            description: 'Customer last name.'
-          },
-          phone: {
-            type: 'string',
-            description: 'Phone number (10 digits).'
-          },
-          email: {
-            type: 'string',
-            description: 'Email address for order confirmation.'
-          },
-          leaveAtDoor: {
-            type: 'boolean',
-            description: 'Leave at door without contact (default: false).'
-          },
-          deliveryInstructions: {
-            type: 'string',
-            description: 'Special delivery instructions (optional).'
-          }
-        },
-        required: ['firstName', 'lastName', 'phone', 'email']
-      },
-      execute(params) {
-        return setCheckoutInfo(params);
-      }
-    },
-    {
-      name: 'place-order',
-      description: `Place the order.
-
-PREREQUISITE: Must call 'set-checkout-info' first to set contact information.
-
-The system will ask for confirmation before finalizing. After confirmation:
-- Order is submitted with confirmation number
-- Transitions to confirmation page showing order details
-- No more actions available (order complete)`,
-      inputSchema: {
-        type: 'object',
-        properties: {}
-      },
-      execute() {
-        return placeOrder();
-      }
-    }
-  ];
+  navigator.modelContext.provideContext({ tools });
 }

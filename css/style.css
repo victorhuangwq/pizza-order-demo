@@ -1216,6 +1216,45 @@ a:hover { text-decoration: underline; }
   .nav-location-pill { display: none; }
 }
 
+/* ---------- Agent Modal ---------- */
+.agent-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: agentFadeIn 0.25s ease;
+}
+@keyframes agentFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.agent-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 48px 56px;
+  text-align: center;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
+  max-width: 420px;
+  width: 90%;
+}
+.agent-modal-spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 24px;
+  border: 5px solid #eee;
+  border-top-color: #E31837;
+  border-radius: 50%;
+  animation: agentSpin 0.8s linear infinite;
+}
+@keyframes agentSpin { to { transform: rotate(360deg); } }
+.agent-modal-text {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2D2D2D;
+  margin: 0;
+  line-height: 1.4;
+}
+
 @media (max-width: 600px) {
   .pizza-grid { grid-template-columns: 1fr; }
   .category-grid { grid-template-columns: repeat(2, 1fr); }

@@ -14,9 +14,13 @@ No test suite, linter, or build step exists. The app is vanilla HTML/CSS/JS serv
 
 This is a **single-page 7-step pizza ordering wizard** that demonstrates the [WebMCP API](https://github.com/webmachinelearning/webmcp) — a browser API letting AI agents discover and call tools exposed by web pages.
 
-### Core pattern: tools change with UI state
+### Core pattern: agent-optimized flow
 
-On every step transition, `webmcp-tools.js` calls `navigator.modelContext.provideContext({ tools })` to **replace** all registered tools with only those relevant to the current step. This is the central design pattern of the app.
+`webmcp-tools.js` registers three high-level tools — `browse`, `create-order`, and `checkout` — via `navigator.modelContext.provideContext({ tools })`. `browse` and `create-order` are **always registered**; `checkout` is added once the cart is populated (step ≥ 7).
+
+### Agent modal
+
+The `browse` tool calls `showAgentModal(name)` to display a spinner overlay ("<agent name> is creating your order"), and `create-order` calls `hideAgentModal()` once the cart is built. This gives the user visual feedback that an agent is working.
 
 ### Shared execution between UI and agent
 
@@ -24,24 +28,20 @@ UI click handlers and WebMCP tool `execute` callbacks call the **same functions*
 
 ### Key files
 
-- **`js/app.js`** — Wizard controller: `orderState` object, step navigation (`goToStep`), all business logic functions (e.g., `selectOrderType`, `setDeliveryAddress`, `addToCart`), DOM rendering per step, and price calculation.
-- **`js/webmcp-tools.js`** — Tool definitions grouped by step (`getStep1Tools()` through `getStep7Tools()`), plus read-only getter tools. Each tool's `execute` delegates to the corresponding `app.js` function.
-- **`js/menu-data.js`** — All mock data: `STORE`, `CATEGORIES`, `PIZZAS`, `SIZES`, `CRUSTS`, `TOPPINGS`, `SIDES`, pricing constants (`DELIVERY_FEE`, `TAX_RATE`).
+- **`js/app.js`** — Wizard controller: `orderState` object, step navigation (`goToStep`), all business logic functions (e.g., `selectOrderType`, `setDeliveryAddress`, `addToCart`, `addSimpleProduct`), DOM rendering per step, price calculation, and agent modal helpers (`showAgentModal`, `hideAgentModal`).
+- **`js/webmcp-tools.js`** — Three tool definitions: `browse` (returns full menu), `create-order` (builds a cart in one call), and `checkout` (sets contact info and places order). Each tool's `execute` delegates to corresponding `app.js` functions.
+- **`js/menu-data.js`** — Unified `PRODUCTS` array (every orderable item with a `customizable` flag and `category`), helper functions `getProductsByCategory()` and `getProductById()`, plus `SIZES`, `CRUSTS`, `TOPPINGS`, and pricing constants (`DELIVERY_FEE`, `TAX_RATE`).
 - **`js/webmcp-shim.js`** — Development polyfill that provides `navigator.modelContext` and a console API (`mcp.help()`, `mcp.call()`) when the real WebMCP API isn't available.
 - **`index.html`** — All 7 steps as `<section>` elements, shown/hidden by `goToStep()`.
 - **`extension/`** — Separate Chrome extension for inspecting WebMCP tools (has its own `package.json` and `manifest.json`). Not part of the main app.
 
 ### Step → Tool mapping
 
-| Step | Tools |
-|------|-------|
-| 1 | `select-order-type` |
-| 2 | `set-delivery-address`, `confirm-location` |
-| 3 | `get-menu-categories`, `select-category` |
-| 4 | `get-available-pizzas`, `select-pizza` |
-| 5 | `get-available-pizzas`, `get-available-toppings`, `customize-pizza`, `add-to-cart` |
-| 6 | `update-cart-item`, `add-side`, `proceed-to-checkout` |
-| 7 | `set-checkout-info`, `place-order` |
+| Tool | Available | Purpose |
+|------|-----------|---------|
+| `browse` | Always | Returns full menu as JSON; shows agent modal |
+| `create-order` | Always | Builds a complete cart (order type, address, items with optional pizza customization) in one call; hides agent modal and navigates to checkout |
+| `checkout` | Step ≥ 7, cart non-empty | Sets contact info, prompts user confirmation, places order |
 
 ## Conventions
 
@@ -49,7 +49,9 @@ UI click handlers and WebMCP tool `execute` callbacks call the **same functions*
 - **Validation errors** are returned as content text (not exceptions): `"Error: Please enter a delivery address."`.
 - **`place-order`** uses `agent.requestUserInteraction()` to get explicit user confirmation via a browser `confirm()` dialog before completing.
 - **Feature detection**: the site works as a normal ordering site without WebMCP. Tools are only registered when `"modelContext" in navigator` is true.
-- **Pricing logic**: base price ± size modifier ($-3 small, $0 medium, $+4 large) + crust modifier (handmade-pan +$1) + extra toppings beyond defaults at $1.50 each. Delivery fee $5.99, tax 9.5%.
+- **Pricing logic**: Customizable products (pizzas): base price ± size modifier ($-3 small, $0 medium, $+4 large) + crust modifier (handmade-pan +$1) + extra toppings beyond defaults at $1.50 each. Non-customizable products use flat `basePrice`. Delivery fee $5.99, tax 9.5%.
+- **Unified product catalog**: All orderable items live in a single `PRODUCTS` array in `menu-data.js`. Products with `customizable: true` (pizzas) support size/crust/topping selection; all others are simple add-to-cart items. The old separate `PIZZAS` and `SIDES` arrays have been removed.
+- **Server**: Uses `dotenv` for environment config; `PORT` defaults to `process.env.PORT || 3000`.
 
 ## Deployment
 
