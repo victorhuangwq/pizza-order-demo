@@ -283,6 +283,7 @@ function addSimpleProduct(product, quantity = 1) {
     existing.price = existing.unitPrice * existing.quantity;
   } else {
     orderState.cart.push({
+      cartId: generateCartId(),
       product: product,
       quantity: quantity,
       unitPrice: product.basePrice,
@@ -424,6 +425,7 @@ function addToCart() {
   const unitPrice = cp.quantity > 0 ? price / cp.quantity : price;
 
   const item = {
+    cartId: generateCartId(),
     product: orderState.selectedProduct,
     size: cp.size,
     sizeName: sizeObj.name,
@@ -735,6 +737,90 @@ function startNewOrder() {
 }
 
 // ============ HELPERS ============
+function generateCartId() {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function generateCartMarkdown() {
+  const lines = [];
+  lines.push('## Cart');
+  lines.push('');
+  if (orderState.cart.length === 0) {
+    lines.push('Cart is empty.');
+  } else {
+    for (const item of orderState.cart) {
+      lines.push(`- \`${item.cartId}\` — ${item.quantity}x ${item.name} — $${item.price.toFixed(2)}`);
+    }
+  }
+  lines.push('');
+  const totals = calculateTotals();
+  lines.push('## Totals');
+  lines.push('');
+  lines.push(`- **Subtotal:** $${totals.subtotal.toFixed(2)}`);
+  if (totals.deliveryFee > 0) lines.push(`- **Delivery Fee:** $${totals.deliveryFee.toFixed(2)}`);
+  lines.push(`- **Tax:** $${totals.tax.toFixed(2)}`);
+  lines.push(`- **Total:** $${totals.total.toFixed(2)}`);
+  return lines.join('\n');
+}
+
+function addItemToCartFromSpec(itemSpec) {
+  const product = getProductById(itemSpec.productId);
+  if (!product) {
+    return { success: false, error: `Product "${itemSpec.productId}" not found.` };
+  }
+
+  const qty = itemSpec.quantity || 1;
+  const cartId = generateCartId();
+
+  if (product.customizable) {
+    const size = itemSpec.size || 'medium';
+    const crust = itemSpec.crust || 'hand-tossed';
+    const toppings = itemSpec.toppings !== undefined ? itemSpec.toppings : [...(product.defaultToppings || [])];
+
+    const sizeObj = SIZES.find(s => s.id === size) || SIZES[1];
+    const crustObj = CRUSTS.find(c => c.id === crust) || CRUSTS[0];
+
+    let unitPrice = product.basePrice;
+    unitPrice += sizeObj.priceModifier;
+    unitPrice += crustObj.priceModifier;
+
+    const defaults = product.defaultToppings || [];
+    const extraToppings = toppings.filter(t => !defaults.includes(t));
+    unitPrice += extraToppings.length * 1.50;
+
+    orderState.cart.push({
+      cartId,
+      product,
+      size,
+      sizeName: sizeObj.name,
+      crust,
+      crustName: crustObj.name,
+      toppings: [...toppings],
+      quantity: qty,
+      unitPrice,
+      price: unitPrice * qty,
+      name: `${sizeObj.name} ${crustObj.name} ${product.name}`,
+      calories: product.calories
+    });
+
+    return { success: true, description: `${qty}x ${sizeObj.name} ${crustObj.name} ${product.name} — $${(unitPrice * qty).toFixed(2)}`, cartId };
+  } else {
+    orderState.cart.push({
+      cartId,
+      product,
+      quantity: qty,
+      unitPrice: product.basePrice,
+      price: product.basePrice * qty,
+      name: product.name,
+      calories: product.calories || ''
+    });
+
+    return { success: true, description: `${qty}x ${product.name} — $${(product.basePrice * qty).toFixed(2)}`, cartId };
+  }
+}
+
 function getCartSubtotal() {
   return orderState.cart.reduce((sum, item) => sum + item.price, 0);
 }

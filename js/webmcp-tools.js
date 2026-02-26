@@ -128,7 +128,9 @@ For customizable products (pizzas), you can optionally specify size, crust, and 
 
 For non-customizable products (sides, drinks, etc.), only productId and quantity are needed.
 
-This tool resets any existing order state and builds a fresh cart. The UI will update to show the populated cart.`,
+This tool resets any existing order state and builds a fresh cart. The UI will update to show the populated cart.
+
+Returns the cart state with unique IDs for each item. Use these IDs with update-order to modify the order.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -190,14 +192,12 @@ This tool resets any existing order state and builds a fresh cart. The UI will u
 
       // Validate all products exist before mutating state
       const errors = [];
-      const resolvedItems = items.map((item, i) => {
-        const product = getProductById(item.productId);
+      for (let i = 0; i < items.length; i++) {
+        const product = getProductById(items[i].productId);
         if (!product) {
-          errors.push(`Item ${i}: product "${item.productId}" not found.`);
-          return null;
+          errors.push(`Item ${i}: product "${items[i].productId}" not found.`);
         }
-        return { ...item, product };
-      });
+      }
 
       if (errors.length > 0) {
         return `Error: ${errors.join(' ')}`;
@@ -214,92 +214,195 @@ This tool resets any existing order state and builds a fresh cart. The UI will u
       confirmLocation('now');
 
       // Add each item to the cart
-      const addedItems = [];
-
-      for (const item of resolvedItems) {
-        const product = item.product;
-        const qty = item.quantity || 1;
-
-        if (product.customizable) {
-          // Build a customized pizza cart entry directly
-          const size = item.size || 'medium';
-          const crust = item.crust || 'hand-tossed';
-          const toppings = item.toppings !== undefined ? item.toppings : [...(product.defaultToppings || [])];
-
-          const sizeObj = SIZES.find(s => s.id === size) || SIZES[1];
-          const crustObj = CRUSTS.find(c => c.id === crust) || CRUSTS[0];
-
-          let unitPrice = product.basePrice;
-          unitPrice += sizeObj.priceModifier;
-          unitPrice += crustObj.priceModifier;
-
-          const defaults = product.defaultToppings || [];
-          const extraToppings = toppings.filter(t => !defaults.includes(t));
-          unitPrice += extraToppings.length * 1.50;
-
-          orderState.cart.push({
-            product: product,
-            size: size,
-            sizeName: sizeObj.name,
-            crust: crust,
-            crustName: crustObj.name,
-            toppings: [...toppings],
-            quantity: qty,
-            unitPrice: unitPrice,
-            price: unitPrice * qty,
-            name: `${sizeObj.name} ${crustObj.name} ${product.name}`,
-            calories: product.calories
-          });
-
-          addedItems.push(`${qty}x ${sizeObj.name} ${crustObj.name} ${product.name} — $${(unitPrice * qty).toFixed(2)}`);
-        } else {
-          // Simple product
-          const existing = orderState.cart.find(ci => ci.product.id === product.id && !ci.size);
-          if (existing) {
-            existing.quantity += qty;
-            existing.price = existing.unitPrice * existing.quantity;
-          } else {
-            orderState.cart.push({
-              product: product,
-              quantity: qty,
-              unitPrice: product.basePrice,
-              price: product.basePrice * qty,
-              name: product.name,
-              calories: product.calories || ''
-            });
-          }
-          addedItems.push(`${qty}x ${product.name} — $${(product.basePrice * qty).toFixed(2)}`);
-        }
+      for (const item of items) {
+        addItemToCartFromSpec(item);
       }
 
       // Clear agent modal and navigate to checkout
       hideAgentModal();
       goToStep(7);
 
-      const totals = calculateTotals();
       const lines = [];
-
-      lines.push(`# Order Created`);
+      lines.push('# Order Created');
       lines.push('');
       lines.push(`- **Type:** ${orderType}`);
       if (address) lines.push(`- **Delivery Address:** ${address}`);
       lines.push('');
-      lines.push('## Items');
-      lines.push('');
-      for (const s of addedItems) {
-        lines.push(`- ${s}`);
-      }
-      lines.push('');
-      lines.push('## Totals');
-      lines.push('');
-      lines.push(`- **Subtotal:** $${totals.subtotal.toFixed(2)}`);
-      if (totals.deliveryFee > 0) lines.push(`- **Delivery Fee:** $${totals.deliveryFee.toFixed(2)}`);
-      lines.push(`- **Tax:** $${totals.tax.toFixed(2)}`);
-      lines.push(`- **Total:** $${totals.total.toFixed(2)}`);
+      lines.push(generateCartMarkdown());
       lines.push('');
       lines.push('---');
       lines.push('');
-      lines.push('Ready for checkout. Use the **checkout** tool to complete the order.');
+      lines.push('Ready for checkout. Use **update-order** to modify or **checkout** to complete the order.');
+
+      return lines.join('\n');
+    }
+  };
+}
+
+// ============ TOOL: update-order ============
+
+function createUpdateOrderTool() {
+  return {
+    name: 'update-order',
+    description: `Modify an existing order by adding new products, removing products, or changing quantities.
+
+Use the cart IDs returned by create-order or a previous update-order call to reference items. Each cart item has a unique 8-character hex ID.
+
+All fields are optional — include only the changes you need to make. Operations are applied in order: removals first, then quantity changes, then additions.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        add: {
+          type: 'array',
+          description: 'New products to add to the cart.',
+          items: {
+            type: 'object',
+            properties: {
+              productId: {
+                type: 'string',
+                description: 'Product ID from the menu (e.g. "pepperoni", "wings-8pc", "coca-cola").'
+              },
+              quantity: {
+                type: 'integer',
+                minimum: 1,
+                description: 'How many of this item. Default: 1.'
+              },
+              size: {
+                type: 'string',
+                enum: ['small', 'medium', 'large'],
+                description: 'Size for customizable products. Default: medium.'
+              },
+              crust: {
+                type: 'string',
+                enum: ['hand-tossed', 'handmade-pan', 'thin', 'brooklyn'],
+                description: 'Crust for customizable products. Default: hand-tossed.'
+              },
+              toppings: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Topping IDs for customizable products. Replaces default toppings. Omit to keep defaults.'
+              }
+            },
+            required: ['productId']
+          }
+        },
+        remove: {
+          type: 'array',
+          description: 'Cart IDs of items to remove.',
+          items: { type: 'string' }
+        },
+        changeQuantity: {
+          type: 'array',
+          description: 'Change quantity for existing cart items.',
+          items: {
+            type: 'object',
+            properties: {
+              cartId: {
+                type: 'string',
+                description: 'The 8-character hex cart ID of the item to update.'
+              },
+              quantity: {
+                type: 'integer',
+                minimum: 1,
+                description: 'New quantity for the item.'
+              }
+            },
+            required: ['cartId', 'quantity']
+          }
+        }
+      }
+    },
+    execute({ add, remove, changeQuantity }) {
+      if (orderState.cart.length === 0 && (!add || add.length === 0)) {
+        return 'Error: Cart is empty and no items to add. Use create-order to build an order first.';
+      }
+
+      const changes = [];
+      const errors = [];
+
+      // 1. Remove items
+      if (remove && remove.length > 0) {
+        for (const cartId of remove) {
+          const idx = orderState.cart.findIndex(item => item.cartId === cartId);
+          if (idx === -1) {
+            errors.push(`Cart ID "${cartId}" not found.`);
+          } else {
+            const item = orderState.cart[idx];
+            changes.push(`Removed ${item.name} (\`${cartId}\`)`);
+            orderState.cart.splice(idx, 1);
+          }
+        }
+      }
+
+      // 2. Change quantities
+      if (changeQuantity && changeQuantity.length > 0) {
+        for (const { cartId, quantity } of changeQuantity) {
+          const item = orderState.cart.find(i => i.cartId === cartId);
+          if (!item) {
+            errors.push(`Cart ID "${cartId}" not found.`);
+          } else {
+            const oldQty = item.quantity;
+            item.quantity = quantity;
+            item.price = item.unitPrice * quantity;
+            changes.push(`Changed ${item.name} (\`${cartId}\`) quantity: ${oldQty} → ${quantity}`);
+          }
+        }
+      }
+
+      // 3. Add new items
+      if (add && add.length > 0) {
+        // Validate all products first
+        const addErrors = [];
+        for (let i = 0; i < add.length; i++) {
+          if (!getProductById(add[i].productId)) {
+            addErrors.push(`Product "${add[i].productId}" not found.`);
+          }
+        }
+        if (addErrors.length > 0) {
+          errors.push(...addErrors);
+        } else {
+          for (const itemSpec of add) {
+            const result = addItemToCartFromSpec(itemSpec);
+            if (result.success) {
+              changes.push(`Added ${result.description} (\`${result.cartId}\`)`);
+            } else {
+              errors.push(result.error);
+            }
+          }
+        }
+      }
+
+      // Re-render cart
+      renderCart();
+      updateCartBadge();
+
+      const lines = [];
+      lines.push('# Order Updated');
+      lines.push('');
+
+      if (errors.length > 0) {
+        lines.push('## Errors');
+        lines.push('');
+        for (const e of errors) {
+          lines.push(`- ${e}`);
+        }
+        lines.push('');
+      }
+
+      if (changes.length > 0) {
+        lines.push('## Changes');
+        lines.push('');
+        for (const c of changes) {
+          lines.push(`- ${c}`);
+        }
+        lines.push('');
+      }
+
+      lines.push(generateCartMarkdown());
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+      lines.push('Use **update-order** to make more changes or **checkout** to complete.');
 
       return lines.join('\n');
     }
@@ -372,11 +475,16 @@ function registerToolsForStep(step) {
   if (!('modelContext' in navigator)) return;
 
   // browse and create-order are always available.
+  // update-order is available once the cart is populated.
   // checkout is only offered once the cart is populated and we're at checkout.
   const tools = [
     createBrowseTool(),
     createCreateOrderTool()
   ];
+
+  if (orderState.cart.length > 0) {
+    tools.push(createUpdateOrderTool());
+  }
 
   if (step >= 7 && orderState.cart.length > 0) {
     tools.push(createCheckoutTool());
