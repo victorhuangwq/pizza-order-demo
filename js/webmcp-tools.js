@@ -455,6 +455,12 @@ The system will prompt the user for confirmation via a browser dialog before fin
         return 'Error: Cart is empty. Call create-order first.';
       }
 
+      // Pre-populate state so renderCheckout() shows filled fields immediately
+      const { firstName, lastName, phone, email, leaveAtDoor, deliveryInstructions } = params;
+      orderState.contact = { firstName: firstName || '', lastName: lastName || '', phone: phone || '', email: email || '' };
+      if (leaveAtDoor !== undefined) orderState.delivery.leaveAtDoor = leaveAtDoor;
+      if (deliveryInstructions !== undefined) orderState.delivery.instructions = deliveryInstructions;
+
       // Navigate to checkout and set info
       proceedToCheckout();
       const infoResult = setCheckoutInfo(params);
@@ -463,6 +469,9 @@ The system will prompt the user for confirmation via a browser dialog before fin
       if (infoResult.content && infoResult.content[0] && infoResult.content[0].text.startsWith('Validation')) {
         return infoResult;
       }
+
+      // Yield to let the browser repaint the filled-in form before the blocking confirm dialog
+      await new Promise(r => setTimeout(r, 50));
 
       // Place the order (may prompt user for confirmation)
       return placeOrder(params, agent);

@@ -59,25 +59,12 @@ Then open **http://localhost:3000** in your browser.
 ├── js/
 │   ├── app.js             # Wizard logic and state management
 │   ├── menu-data.js       # Unified product catalog & customization options
-│   ├── webmcp-tools.js    # WebMCP tool definitions (browse, create-order, checkout)
-│   └── webmcp-shim.js     # Polyfill for local testing
+│   └── webmcp-tools.js    # WebMCP tool definitions (browse, create-order, checkout)
 ├── server.js              # Local dev server
 └── package.json
 ```
 
 ## For Developers
-
-### Testing with Console Polyfill
-
-For local testing without a WebMCP implementation, this site includes a polyfill that provides a console API. This is helpful for development but not the primary testing method (use the Chrome EPP setup above).
-
-Open the browser console and try:
-
-```javascript
-mcp.help()                    // List available tools
-mcp.help('browse')            // Details for a specific tool
-mcp.call('browse', { name: 'TestAgent' })  // Execute a tool
-```
 
 ### Deployment
 

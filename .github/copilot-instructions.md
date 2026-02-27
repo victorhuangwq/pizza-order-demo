@@ -31,7 +31,6 @@ UI click handlers and WebMCP tool `execute` callbacks call the **same functions*
 - **`js/app.js`** — Wizard controller: `orderState` object, step navigation (`goToStep`), all business logic functions (e.g., `selectOrderType`, `setDeliveryAddress`, `addToCart`, `addSimpleProduct`), DOM rendering per step, price calculation, and agent modal helpers (`showAgentModal`, `hideAgentModal`).
 - **`js/webmcp-tools.js`** — Three tool definitions: `browse` (returns full menu), `create-order` (builds a cart in one call), and `checkout` (sets contact info and places order). Each tool's `execute` delegates to corresponding `app.js` functions.
 - **`js/menu-data.js`** — Unified `PRODUCTS` array (every orderable item with a `customizable` flag and `category`), helper functions `getProductsByCategory()` and `getProductById()`, plus `SIZES`, `CRUSTS`, `TOPPINGS`, and pricing constants (`DELIVERY_FEE`, `TAX_RATE`).
-- **`js/webmcp-shim.js`** — Development polyfill that provides `navigator.modelContext` and a console API (`mcp.help()`, `mcp.call()`) when the real WebMCP API isn't available.
 - **`index.html`** — All 7 steps as `<section>` elements, shown/hidden by `goToStep()`.
 - **`extension/`** — Separate Chrome extension for inspecting WebMCP tools (has its own `package.json` and `manifest.json`). Not part of the main app.
 
