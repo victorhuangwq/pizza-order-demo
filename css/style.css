@@ -1071,15 +1071,11 @@ a:hover { text-decoration: underline; }
   padding: 0 24px 48px;
 }
 
-.checkout-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 0;
-  border-bottom: 1px solid #eee;
+.checkout-headline {
   margin-bottom: 8px;
 }
-.checkout-header .back-link {
+
+.checkout-back {
   border: none;
   width: auto;
   height: auto;
@@ -1090,10 +1086,12 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   gap: 4px;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 24px;
 }
-.checkout-header .back-link:hover { text-decoration: underline; }
-
-.checkout-headline { margin-bottom: 28px; }
+.checkout-back:hover { text-decoration: underline; }
 
 .checkout-body { display: flex; gap: 36px; align-items: flex-start; }
 .checkout-left { flex: 1; }
