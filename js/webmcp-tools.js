@@ -481,24 +481,27 @@ The system will prompt the user for confirmation via a browser dialog before fin
 
 // ============ REGISTRATION ============
 
+const ALL_TOOL_NAMES = ['browse', 'create-order', 'update-order', 'checkout'];
+
 function registerToolsForStep(step) {
   if (!('modelContext' in navigator)) return;
 
+  // Unregister all tools first, then re-register the ones needed for this step.
+  for (const name of ALL_TOOL_NAMES) {
+    navigator.modelContext.unregisterTool(name);
+  }
+
   // browse and create-order are always available.
+  navigator.modelContext.registerTool(createBrowseTool());
+  navigator.modelContext.registerTool(createCreateOrderTool());
+
   // update-order is available once the cart is populated.
-  // checkout is only offered once the cart is populated and we're at checkout.
-  const tools = [
-    createBrowseTool(),
-    createCreateOrderTool()
-  ];
-
   if (orderState.cart.length > 0) {
-    tools.push(createUpdateOrderTool());
+    navigator.modelContext.registerTool(createUpdateOrderTool());
   }
 
+  // checkout is only offered once the cart is populated and we're at checkout.
   if (step >= 7 && orderState.cart.length > 0) {
-    tools.push(createCheckoutTool());
+    navigator.modelContext.registerTool(createCheckoutTool());
   }
-
-  navigator.modelContext.provideContext({ tools });
 }
