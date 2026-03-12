@@ -1,7 +1,7 @@
 {
-  "name": "checkers-pizza-webmcp-demo",
+  "name": "checkers-pizza-demo",
   "version": "1.0.0",
-  "description": "Checkers Pizza - WebMCP demo site for browser agent form filling",
+  "description": "Checkers Pizza - demo pizza ordering site",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -32,18 +32,6 @@ const orderState = {
 
 let currentStep = 1;
 
-// ============ AGENT MODAL ============
-function showAgentModal(agentName) {
-  const overlay = document.getElementById('agentModal');
-  const text = document.getElementById('agentModalText');
-  text.textContent = `${agentName} is creating your order`;
-  overlay.style.display = 'flex';
-}
-
-function hideAgentModal() {
-  document.getElementById('agentModal').style.display = 'none';
-}
-
 // ============ STEP NAVIGATION ============
 function goToStep(step, skipHistoryUpdate = false) {
   // Hide all steps
@@ -69,11 +57,6 @@ function goToStep(step, skipHistoryUpdate = false) {
 
   // Update cart badge
   updateCartBadge();
-
-  // Register WebMCP tools for this step
-  if (typeof registerToolsForStep === 'function') {
-    registerToolsForStep(step);
-  }
 
   // Update URL
   if (!skipHistoryUpdate) {
@@ -980,7 +963,7 @@ function goToHome() {
 }
 
 // ============ INIT ============
-// Start on Step 1 — register tools once webmcp-tools.js loads
+// Start on Step 1
 document.addEventListener('DOMContentLoaded', () => {
   // Check if there's a path indicating a specific step, otherwise start at step 1
   const path = window.location.pathname;
