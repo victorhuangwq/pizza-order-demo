@@ -481,32 +481,30 @@ The system will prompt the user for confirmation via a browser dialog before fin
 
 // ============ REGISTRATION ============
 
-const registeredTools = new Set();
+// AbortController used to unregister all tools from the previous step.
+let toolRegistrationController = null;
 
 function registerToolsForStep(step) {
   if (!('modelContext' in navigator)) return;
 
-  // Unregister only tools that are currently registered.
-  for (const name of registeredTools) {
-    navigator.modelContext.unregisterTool(name);
+  // Abort previous registrations to unregister all current tools.
+  if (toolRegistrationController) {
+    toolRegistrationController.abort();
   }
-  registeredTools.clear();
+  toolRegistrationController = new AbortController();
+  const { signal } = toolRegistrationController;
 
   // browse and create-order are always available.
-  navigator.modelContext.registerTool(createBrowseTool());
-  registeredTools.add('browse');
-  navigator.modelContext.registerTool(createCreateOrderTool());
-  registeredTools.add('create-order');
+  navigator.modelContext.registerTool(createBrowseTool(), { signal });
+  navigator.modelContext.registerTool(createCreateOrderTool(), { signal });
 
   // update-order is available once the cart is populated.
   if (orderState.cart.length > 0) {
-    navigator.modelContext.registerTool(createUpdateOrderTool());
-    registeredTools.add('update-order');
+    navigator.modelContext.registerTool(createUpdateOrderTool(), { signal });
   }
 
   // checkout is only offered once the cart is populated and we're at checkout.
   if (step >= 7 && orderState.cart.length > 0) {
-    navigator.modelContext.registerTool(createCheckoutTool());
-    registeredTools.add('checkout');
+    navigator.modelContext.registerTool(createCheckoutTool(), { signal });
   }
 }
