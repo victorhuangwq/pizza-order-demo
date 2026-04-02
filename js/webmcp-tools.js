@@ -481,30 +481,41 @@ The system will prompt the user for confirmation via a browser dialog before fin
 
 // ============ REGISTRATION ============
 
-// AbortController used to unregister all tools from the previous step.
-let toolRegistrationController = null;
+// Per-tool AbortControllers so we can unregister individually.
+const toolControllers = new Map();
+
+function ensureToolRegistered(name, createFn) {
+  if (toolControllers.has(name)) return; // already registered
+  const controller = new AbortController();
+  navigator.modelContext.registerTool(createFn(), { signal: controller.signal });
+  toolControllers.set(name, controller);
+}
+
+function ensureToolUnregistered(name) {
+  const controller = toolControllers.get(name);
+  if (!controller) return; // not registered
+  controller.abort();
+  toolControllers.delete(name);
+}
 
 function registerToolsForStep(step) {
   if (!('modelContext' in navigator)) return;
 
-  // Abort previous registrations to unregister all current tools.
-  if (toolRegistrationController) {
-    toolRegistrationController.abort();
-  }
-  toolRegistrationController = new AbortController();
-  const { signal } = toolRegistrationController;
-
   // browse and create-order are always available.
-  navigator.modelContext.registerTool(createBrowseTool(), { signal });
-  navigator.modelContext.registerTool(createCreateOrderTool(), { signal });
+  ensureToolRegistered('browse', createBrowseTool);
+  ensureToolRegistered('create-order', createCreateOrderTool);
 
   // update-order is available once the cart is populated.
   if (orderState.cart.length > 0) {
-    navigator.modelContext.registerTool(createUpdateOrderTool(), { signal });
+    ensureToolRegistered('update-order', createUpdateOrderTool);
+  } else {
+    ensureToolUnregistered('update-order');
   }
 
   // checkout is only offered once the cart is populated and we're at checkout.
   if (step >= 7 && orderState.cart.length > 0) {
-    navigator.modelContext.registerTool(createCheckoutTool(), { signal });
+    ensureToolRegistered('checkout', createCheckoutTool);
+  } else {
+    ensureToolUnregistered('checkout');
   }
 }
