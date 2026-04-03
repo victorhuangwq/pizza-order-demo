@@ -33,7 +33,7 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
-.nav-left { display: flex; gap: 2px; align-items: center; }
+.nav-left { display: flex; gap: 2px; align-items: center; overflow: hidden; flex-shrink: 1; min-width: 0; }
 
 .nav-link {
   color: #fff;
@@ -45,6 +45,8 @@ a:hover { text-decoration: underline; }
   text-decoration: none;
   transition: all 0.15s;
   text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .nav-link:hover { color: #fff; background: rgba(255,255,255,0.15); text-decoration: none; }
 .nav-link.active { color: #fff; background: rgba(255,255,255,0.2); }
@@ -69,7 +71,7 @@ a:hover { text-decoration: underline; }
 .nav-logo.small .logo-icon { font-size: 22px; }
 .nav-logo.small .logo-text { font-size: 10px; }
 
-.nav-right { display: flex; align-items: center; gap: 12px; }
+.nav-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
 .nav-location-pill {
   display: flex;
@@ -1212,6 +1214,8 @@ a:hover { text-decoration: underline; }
   .home-deals-banner { grid-template-columns: 1fr; }
   .menu-header-row { flex-direction: column; align-items: flex-start; gap: 12px; }
   .nav-location-pill { display: none; }
+  .nav-link[data-nav="rewards"],
+  .nav-link[data-nav="tracker"] { display: none; }
 }
 
 /* ---------- Agent Modal ---------- */
@@ -1260,6 +1264,8 @@ a:hover { text-decoration: underline; }
   .top-nav { padding: 0 12px; }
   .nav-left { gap: 0; }
   .nav-link { padding: 6px 8px; font-size: 11px; }
+  .nav-link[data-nav="deals"] { display: none; }
+  .sign-in-btn { display: none; }
   .topping-grid { grid-template-columns: repeat(2, 1fr); }
   .sides-grid { grid-template-columns: 1fr; }
   .order-type-buttons { flex-direction: column; }
