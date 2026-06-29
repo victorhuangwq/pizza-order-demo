@@ -28,7 +28,7 @@ To test this demo with a real WebMCP implementation:
 
 ## How It Works
 
-The site exposes three high-level WebMCP tools via `navigator.modelContext.provideContext({ tools })`. An AI agent can complete an entire order in as few as three tool calls:
+The site exposes high-level WebMCP tools via `document.modelContext.registerTool(...)`. An AI agent can complete an entire order in as few as three tool calls:
 
 | Tool | Purpose |
 |------|---------|

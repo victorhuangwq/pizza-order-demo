@@ -16,7 +16,7 @@ This is a **single-page 7-step pizza ordering wizard** that demonstrates the [We
 
 ### Core pattern: agent-optimized flow
 
-`webmcp-tools.js` registers three high-level tools — `browse`, `create-order`, and `checkout` — via `navigator.modelContext.provideContext({ tools })`. `browse` and `create-order` are **always registered**; `checkout` is added once the cart is populated (step ≥ 7).
+`webmcp-tools.js` registers high-level tools — `browse`, `create-order`, `update-order`, and `checkout` — via `document.modelContext.registerTool(tool, { signal })`. `browse` and `create-order` are **always registered**; `update-order` and `checkout` are added once the cart is populated (step ≥ 7). Each tool has its own `AbortController`, so individual tools can be unregistered by aborting their signal.
 
 ### Agent modal
 
@@ -46,8 +46,8 @@ UI click handlers and WebMCP tool `execute` callbacks call the **same functions*
 
 - **Tool responses** always return `{ content: [{ type: "text", text: "..." }] }` with a confirmation of what was done, current state summary, and a hint for next action.
 - **Validation errors** are returned as content text (not exceptions): `"Error: Please enter a delivery address."`.
-- **`place-order`** uses `agent.requestUserInteraction()` to get explicit user confirmation via a browser `confirm()` dialog before completing.
-- **Feature detection**: the site works as a normal ordering site without WebMCP. Tools are only registered when `"modelContext" in navigator` is true.
+- **`checkout`** prompts the user for confirmation via a browser `confirm()` dialog before finalizing. (The previous `agent.requestUserInteraction()` flow was removed when the `ToolExecuteCallback` signature changed to `Promise<any>(object input)` — execute callbacks now take only the input object.)
+- **Feature detection**: the site works as a normal ordering site without WebMCP. Tools are only registered when `"modelContext" in document` is true.
 - **Pricing logic**: Customizable products (pizzas): base price ± size modifier ($-3 small, $0 medium, $+4 large) + crust modifier (handmade-pan +$1) + extra toppings beyond defaults at $1.50 each. Non-customizable products use flat `basePrice`. Delivery fee $5.99, tax 9.5%.
 - **Unified product catalog**: All orderable items live in a single `PRODUCTS` array in `menu-data.js`. Products with `customizable: true` (pizzas) support size/crust/topping selection; all others are simple add-to-cart items. The old separate `PIZZAS` and `SIDES` arrays have been removed.
 - **Server**: Uses `dotenv` for environment config; `PORT` defaults to `process.env.PORT || 3000`.

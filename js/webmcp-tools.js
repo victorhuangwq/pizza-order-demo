@@ -7,6 +7,8 @@
 function createBrowseTool() {
   return {
     name: 'browse',
+    title: 'Browse the Checkers Pizza menu',
+    annotations: { readOnlyHint: true },
     description: `Begin an ordering session on behalf of the user. Shows a status indicator so the human knows an agent is working, then returns the full Checkers Pizza menu as structured JSON.
 
 Includes:
@@ -120,6 +122,7 @@ Use the product IDs from this response when calling create-order.`,
 function createCreateOrderTool() {
   return {
     name: 'create-order',
+    title: 'Create a new order',
     description: `Create a new order with the specified items in a single call.
 
 Accepts an order type, delivery address, and an array of items to add to the cart. Each item references a product ID from the menu (call browse first to see available IDs).
@@ -244,6 +247,7 @@ Returns the cart state with unique IDs for each item. Use these IDs with update-
 function createUpdateOrderTool() {
   return {
     name: 'update-order',
+    title: 'Update the current order',
     description: `Modify an existing order by adding new products, removing products, or changing quantities.
 
 Use the cart IDs returned by create-order or a previous update-order call to reference items. Each cart item has a unique 8-character hex ID.
@@ -415,6 +419,7 @@ All fields are optional — include only the changes you need to make. Operation
 function createCheckoutTool() {
   return {
     name: 'checkout',
+    title: 'Place the order',
     description: `Complete the order by providing customer contact info and delivery preferences.
 
 PREREQUISITE: Call create-order first to populate the cart.
@@ -450,7 +455,7 @@ The system will prompt the user for confirmation via a browser dialog before fin
       },
       required: ['firstName', 'lastName', 'phone', 'email']
     },
-    async execute(params, agent) {
+    async execute(params) {
       if (orderState.cart.length === 0) {
         return 'Error: Cart is empty. Call create-order first.';
       }
@@ -466,15 +471,15 @@ The system will prompt the user for confirmation via a browser dialog before fin
       const infoResult = setCheckoutInfo(params);
 
       // If setCheckoutInfo returned a validation error, surface it
-      if (infoResult.content && infoResult.content[0] && infoResult.content[0].text.startsWith('Validation')) {
+      if (typeof infoResult === 'string' && infoResult.startsWith('Validation')) {
         return infoResult;
       }
 
       // Yield to let the browser repaint the filled-in form before the blocking confirm dialog
       await new Promise(r => setTimeout(r, 50));
 
-      // Place the order (may prompt user for confirmation)
-      return placeOrder(params, agent);
+      // Place the order (will prompt the user via confirm() before finalizing)
+      return placeOrder();
     }
   };
 }
@@ -487,7 +492,7 @@ const toolControllers = new Map();
 function ensureToolRegistered(name, createFn) {
   if (toolControllers.has(name)) return; // already registered
   const controller = new AbortController();
-  navigator.modelContext.registerTool(createFn(), { signal: controller.signal });
+  document.modelContext.registerTool(createFn(), { signal: controller.signal });
   toolControllers.set(name, controller);
 }
 
@@ -499,7 +504,7 @@ function ensureToolUnregistered(name) {
 }
 
 function registerToolsForStep(step) {
-  if (!('modelContext' in navigator)) return;
+  if (!('modelContext' in document)) return;
 
   // browse and create-order are always available.
   ensureToolRegistered('browse', createBrowseTool);

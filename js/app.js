@@ -636,7 +636,7 @@ function setCheckoutInfo({ firstName, lastName, phone, email, leaveAtDoor, deliv
   return `Checkout info saved for ${firstName} ${lastName}. Ready to place order. Total: $${totals.total.toFixed(2)}. Use place-order to complete.`;
 }
 
-async function placeOrder(params, agent) {
+async function placeOrder() {
   // Validate contact
   updateCheckoutState();
   const c = orderState.contact;
@@ -648,27 +648,17 @@ async function placeOrder(params, agent) {
 
   const totals = calculateTotals();
 
-  // Use requestUserInteraction if agent is available
-  if (agent && typeof agent.requestUserInteraction === 'function') {
-    const confirmed = await agent.requestUserInteraction(async () => {
-      return new Promise((resolve) => {
-        const ok = confirm(
-          `Place order for $${totals.total.toFixed(2)}?\n` +
-          `${orderState.orderType === 'delivery' ? `Delivery to: ${orderState.address}` : `Carryout from: ${orderState.store.name}`}\n` +
-          `${orderState.cart.map(i => `  ${i.quantity}x ${i.name}`).join('\n')}\n\n` +
-          `Click OK to confirm.`
-        );
-        resolve(ok);
-      });
-    });
-    if (!confirmed) {
-      return 'Order cancelled by user.';
-    }
-  } else {
-    // No agent — confirm via browser dialog
-    const ok = confirm(`Place order for $${totals.total.toFixed(2)}?`);
-    if (!ok) return 'Order cancelled by user.';
-  }
+  // Confirm via browser dialog. The new WebMCP API
+  // (ToolExecuteCallback signature: Promise<any>(object input)) no longer
+  // passes an `agent` argument with requestUserInteraction — tools that need
+  // user confirmation drive it directly through the page UI.
+  const ok = confirm(
+    `Place order for $${totals.total.toFixed(2)}?\n` +
+    `${orderState.orderType === 'delivery' ? `Delivery to: ${orderState.address}` : `Carryout from: ${orderState.store.name}`}\n` +
+    `${orderState.cart.map(i => `  ${i.quantity}x ${i.name}`).join('\n')}\n\n` +
+    `Click OK to confirm.`
+  );
+  if (!ok) return 'Order cancelled by user.';
 
   // Generate order number
   const orderNumber = `CP-${String(Math.floor(10000 + Math.random() * 90000))}`;
