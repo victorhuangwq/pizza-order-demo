@@ -19,5 +19,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Checkers Pizza demo running at http://localhost:${PORT}/pizza-order-demo/`);
+  console.log(`Contoso Pizza demo running at http://localhost:${PORT}/pizza-order-demo/`);
 });

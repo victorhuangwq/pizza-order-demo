@@ -1,4 +1,4 @@
-// webmcp-tools.js — WebMCP tool definitions for Checkers Pizza
+// webmcp-tools.js - WebMCP tool definitions for Contoso Pizza
 // Exposes three agentic tools: browse, create-order, checkout.
 // These are always registered — no per-step swapping needed.
 
@@ -7,9 +7,9 @@
 function createBrowseTool() {
   return {
     name: 'browse',
-    title: 'Browse the Checkers Pizza menu',
+    title: 'Browse the Contoso Pizza menu',
     annotations: { readOnlyHint: true },
-    description: `Begin an ordering session on behalf of the user. Shows a status indicator so the human knows an agent is working, then returns the full Checkers Pizza menu as structured JSON.
+    description: `Begin an ordering session on behalf of the user. Shows a status indicator so the human knows an agent is working, then returns the full Contoso Pizza menu as structured JSON.
 
 Includes:
 • Store information (location, hours, delivery estimate)
@@ -18,13 +18,13 @@ Includes:
 • Size, crust, and topping options with price modifiers (apply only to customizable products)
 
 PRICING RULES:
-• Customizable products (pizzas): price = basePrice + size modifier + crust modifier + (extra toppings beyond defaults × $1.50 each)
-  - Sizes: small (-$3.00), medium ($0), large (+$4.00)
-  - Crusts: hand-tossed ($0), handmade-pan (+$1.00), thin ($0), brooklyn ($0)
-  - Extra toppings: $1.50 each beyond the pizza's default toppings
+• Customizable products (pizzas): price = basePrice + size modifier + crust modifier + (extra toppings beyond defaults x $1.25 each)
+  - Sizes: small (-$2.50), medium ($0), large (+$3.50)
+  - Crusts: classic ($0), pan (+$1.25), thin ($0), stone-baked (+$0.75)
+  - Extra toppings: $1.25 each beyond the pizza's default toppings
 • Non-customizable products: price = basePrice
-• Delivery fee: $5.99 (delivery orders only)
-• Tax: 9.5% on subtotal + delivery fee
+• Delivery fee: $4.50 (delivery orders only)
+• Illustrative tax: 8.75% on subtotal + delivery fee
 
 Use the product IDs from this response when calling create-order.`,
     inputSchema: {
@@ -107,7 +107,7 @@ Use the product IDs from this response when calling create-order.`,
         lines.push(`- **${c.name}** — ${mod}${def}`);
       }
       lines.push('');
-      lines.push('### Toppings ($1.50 each beyond defaults)');
+      lines.push('### Toppings ($1.25 each beyond defaults)');
       for (const t of TOPPINGS) {
         lines.push(`- ${t.name}`);
       }
@@ -127,7 +127,7 @@ function createCreateOrderTool() {
 
 Accepts an order type, delivery address, and an array of items to add to the cart. Each item references a product ID from the menu (call browse first to see available IDs).
 
-For customizable products (pizzas), you can optionally specify size, crust, and toppings. Omitted fields use defaults (medium, hand-tossed, the pizza's default toppings).
+For customizable products (pizzas), you can optionally specify size, crust, and toppings. Omitted fields use defaults (medium, classic, the pizza's default toppings).
 
 For non-customizable products (sides, drinks, etc.), only productId and quantity are needed.
 
@@ -154,7 +154,7 @@ Returns the cart state with unique IDs for each item. Use these IDs with update-
             properties: {
               productId: {
                 type: 'string',
-                description: 'Product ID from the menu (e.g. "pepperoni", "wings-8pc", "coca-cola").'
+                description: 'Product ID from the menu (e.g. "pepperoni", "wings-8pc", "cola").'
               },
               quantity: {
                 type: 'integer',
@@ -168,8 +168,8 @@ Returns the cart state with unique IDs for each item. Use these IDs with update-
               },
               crust: {
                 type: 'string',
-                enum: ['hand-tossed', 'handmade-pan', 'thin', 'brooklyn'],
-                description: 'Crust for customizable products. Default: hand-tossed.'
+                enum: ['classic', 'pan', 'thin', 'stone-baked'],
+                description: 'Crust for customizable products. Default: classic.'
               },
               toppings: {
                 type: 'array',
@@ -264,7 +264,7 @@ All fields are optional — include only the changes you need to make. Operation
             properties: {
               productId: {
                 type: 'string',
-                description: 'Product ID from the menu (e.g. "pepperoni", "wings-8pc", "coca-cola").'
+                description: 'Product ID from the menu (e.g. "pepperoni", "wings-8pc", "cola").'
               },
               quantity: {
                 type: 'integer',
@@ -278,8 +278,8 @@ All fields are optional — include only the changes you need to make. Operation
               },
               crust: {
                 type: 'string',
-                enum: ['hand-tossed', 'handmade-pan', 'thin', 'brooklyn'],
-                description: 'Crust for customizable products. Default: hand-tossed.'
+                enum: ['classic', 'pan', 'thin', 'stone-baked'],
+                description: 'Crust for customizable products. Default: classic.'
               },
               toppings: {
                 type: 'array',

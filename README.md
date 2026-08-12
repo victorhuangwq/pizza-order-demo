@@ -1,8 +1,8 @@
-# Pizza Order Demo (Imperative WebMCP Implementation)
+# Contoso Pizza Order Demo (Imperative WebMCP Implementation)
 
-A demo site implementing the [imperative version of WebMCP](https://github.com/webmachinelearning/webmcp), a browser API that enables AI agents to discover and interact with tools exposed by web pages. This example demonstrates a pizza ordering flow where three agentic tools (`browse`, `create-order`, `checkout`) let an AI agent build a complete order in just a few calls.
+A fictitious Contoso Pizza demo site implementing the [imperative version of WebMCP](https://github.com/webmachinelearning/webmcp), a browser API that enables AI agents to discover and interact with tools exposed by web pages. This example demonstrates a pizza ordering flow where three agentic tools (`browse`, `create-order`, `checkout`) let an AI agent build a complete order in just a few calls.
 
-![Pizza Order Demo](image.png)
+![Contoso Pizza order demo](image.png)
 
 ## 🚀 Live Demo
 
@@ -48,6 +48,8 @@ npm start
 ```
 
 Then open **http://localhost:3000** in your browser.
+
+> This is a fictitious demo site. Contoso Pizza is a fictitious company. No association with any real company is intended or should be inferred.
 
 ## Project Structure
 

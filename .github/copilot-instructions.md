@@ -1,4 +1,4 @@
-# Copilot Instructions — Checkers Pizza WebMCP Demo
+# Copilot Instructions - Contoso Pizza WebMCP Demo
 
 ## Build & Run
 
@@ -46,9 +46,9 @@ UI click handlers and WebMCP tool `execute` callbacks call the **same functions*
 
 - **Tool responses** always return `{ content: [{ type: "text", text: "..." }] }` with a confirmation of what was done, current state summary, and a hint for next action.
 - **Validation errors** are returned as content text (not exceptions): `"Error: Please enter a delivery address."`.
-- **`checkout`** prompts the user for confirmation via a browser `confirm()` dialog before finalizing. (The previous `agent.requestUserInteraction()` flow was removed when the `ToolExecuteCallback` signature changed to `Promise<any>(object input)` — execute callbacks now take only the input object.)
-- **Feature detection**: the site works as a normal ordering site without WebMCP. Tools are only registered when `"modelContext" in document` is true.
-- **Pricing logic**: Customizable products (pizzas): base price ± size modifier ($-3 small, $0 medium, $+4 large) + crust modifier (handmade-pan +$1) + extra toppings beyond defaults at $1.50 each. Non-customizable products use flat `basePrice`. Delivery fee $5.99, tax 9.5%.
+- **`checkout`** prompts the user for confirmation via a browser `confirm()` dialog before finalizing.
+- **Feature detection**: the site works as a normal ordering site without WebMCP. Tools are registered only when `document.modelContext` is available.
+- **Pricing logic**: Customizable products (pizzas): base price plus the selected size and crust modifiers, plus extra toppings beyond defaults at $1.25 each. Non-customizable products use flat `basePrice`. Delivery fee is $4.50 and illustrative tax is 8.75%.
 - **Unified product catalog**: All orderable items live in a single `PRODUCTS` array in `menu-data.js`. Products with `customizable: true` (pizzas) support size/crust/topping selection; all others are simple add-to-cart items. The old separate `PIZZAS` and `SIDES` arrays have been removed.
 - **Server**: Uses `dotenv` for environment config; `PORT` defaults to `process.env.PORT || 3000`.
 

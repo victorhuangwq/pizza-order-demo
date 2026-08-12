@@ -10,7 +10,7 @@ const orderState = {
   selectedProduct: null,     // the product being customized
   currentCustomization: {    // customization state (for customizable products)
     size: 'medium',
-    crust: 'hand-tossed',
+    crust: 'classic',
     toppings: [],
     quantity: 1
   },
@@ -176,7 +176,7 @@ function confirmLocation(timing) {
 // ============ STEP 3: MENU CATEGORIES ============
 const CATEGORY_EMOJIS = {
   'build-your-own': '🍕', 'specialty': '🍕', 'breads': '🥖',
-  'loaded-tots': '🥔', 'chicken': '🍗', 'desserts': '🍫',
+  'potato-sides': '🥔', 'chicken': '🍗', 'desserts': '🍫',
   'pastas': '🍝', 'sandwiches': '🥪', 'salads': '🥗',
   'drinks': '🥤', 'extras': '🧂'
 };
@@ -260,7 +260,7 @@ function selectProduct(productId) {
   orderState.selectedProduct = product;
   orderState.currentCustomization = {
     size: 'medium',
-    crust: 'hand-tossed',
+    crust: 'classic',
     toppings: [...(product.defaultToppings || [])],
     quantity: 1
   };
@@ -407,7 +407,7 @@ function calculateCustomizedPrice() {
   // Extra toppings beyond default
   const defaults = product.defaultToppings || [];
   const extraToppings = cp.toppings.filter(t => !defaults.includes(t));
-  price += extraToppings.length * 1.50;
+  price += extraToppings.length * EXTRA_TOPPING_PRICE;
 
   return price * cp.quantity;
 }
@@ -478,7 +478,7 @@ function renderCart() {
   }
 
   // Sides — show a curated selection of popular non-customizable products
-  const sideProducts = PRODUCTS.filter(p => !p.customizable && ['breads', 'loaded-tots', 'chicken', 'desserts'].includes(p.category)).slice(0, 6);
+  const sideProducts = PRODUCTS.filter(p => !p.customizable && ['breads', 'potato-sides', 'chicken', 'desserts'].includes(p.category)).slice(0, 6);
   document.getElementById('sidesGrid').innerHTML = sideProducts.map(product => `
     <div class="side-card">
       <div class="side-card-img-placeholder">${product.emoji || '🥖'}</div>
@@ -501,7 +501,7 @@ function updateCartItemQty(index, delta) {
     const defaults = item.product.defaultToppings || [];
     let unitPrice = item.product.basePrice + (sizeObj ? sizeObj.priceModifier : 0) + (crustObj ? crustObj.priceModifier : 0);
     const extraToppings = (item.toppings || []).filter(t => !defaults.includes(t));
-    unitPrice += extraToppings.length * 1.50;
+    unitPrice += extraToppings.length * EXTRA_TOPPING_PRICE;
     item.unitPrice = unitPrice;
     item.price = unitPrice * item.quantity;
   } else {
@@ -712,7 +712,7 @@ function startNewOrder() {
   orderState.timing = 'now';
   orderState.currentCategory = null;
   orderState.selectedProduct = null;
-  orderState.currentCustomization = { size: 'medium', crust: 'hand-tossed', toppings: [], quantity: 1 };
+  orderState.currentCustomization = { size: 'medium', crust: 'classic', toppings: [], quantity: 1 };
   orderState.cart = [];
   orderState.contact = { firstName: '', lastName: '', phone: '', email: '' };
   orderState.delivery = { leaveAtDoor: false, instructions: '' };
@@ -766,7 +766,7 @@ function addItemToCartFromSpec(itemSpec) {
 
   if (product.customizable) {
     const size = itemSpec.size || 'medium';
-    const crust = itemSpec.crust || 'hand-tossed';
+    const crust = itemSpec.crust || 'classic';
     const toppings = itemSpec.toppings !== undefined ? itemSpec.toppings : [...(product.defaultToppings || [])];
 
     const sizeObj = SIZES.find(s => s.id === size) || SIZES[1];
@@ -778,7 +778,7 @@ function addItemToCartFromSpec(itemSpec) {
 
     const defaults = product.defaultToppings || [];
     const extraToppings = toppings.filter(t => !defaults.includes(t));
-    unitPrice += extraToppings.length * 1.50;
+    unitPrice += extraToppings.length * EXTRA_TOPPING_PRICE;
 
     orderState.cart.push({
       cartId,
@@ -827,13 +827,13 @@ function updateNavDeliveryInfo() {
   const el = document.getElementById('navDeliveryInfo');
   const pill = document.getElementById('navLocationPill');
   if (orderState.address && orderState.store && currentStep >= 3) {
-    el.style.display = 'flex';
-    if (pill) pill.style.display = 'none';
+    el.hidden = false;
+    if (pill) pill.hidden = true;
     document.getElementById('navDeliveryText').textContent =
       `Delivery \u00B7 ${orderState.store.deliveryEstimate} \u00B7 ${orderState.address.substring(0, 30)}${orderState.address.length > 30 ? '...' : ''}`;
   } else {
-    el.style.display = 'none';
-    if (pill) pill.style.display = 'flex';
+    el.hidden = true;
+    if (pill) pill.hidden = false;
   }
 }
 
