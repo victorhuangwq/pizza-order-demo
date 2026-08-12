@@ -37,12 +37,19 @@
         <button class="edit-btn" title="Edit">✏️</button>
       </div>
       <button class="nav-btn sign-in-btn">SIGN IN</button>
-      <button class="nav-btn cart-btn" id="cartBtn" onclick="goToStep(6)">
+      <button class="nav-btn cart-btn" id="cartBtn" onclick="viewCart()">
         🛒
         <span class="cart-badge" id="cartBadge" style="display:none;">0</span>
       </button>
     </div>
   </header>
+
+  <div class="cart-toast" id="cartToast" role="status" aria-live="polite" hidden>
+    <span class="cart-toast-icon">✓</span>
+    <span class="cart-toast-message" id="cartToastMessage"></span>
+    <button class="cart-toast-view" id="cartToastViewButton" onclick="viewCart()">VIEW CART</button>
+    <button class="cart-toast-close" onclick="hideCartToast()" aria-label="Dismiss cart notification">✕</button>
+  </div>
 
   <!-- ============== STEP 1: ORDER TYPE + MENU HOME ============== -->
   <section class="step" id="step-1">
@@ -179,8 +186,9 @@
   <section class="step" id="step-5" style="display:none;">
     <div class="customize-page">
       <div class="customize-header">
+        <button class="customize-back" id="customizeBackBtn" onclick="cancelCustomization()">‹ Back to products</button>
         <h1 class="pizza-name-headline" id="customizePizzaName"></h1>
-        <button class="btn-primary add-to-cart-top" onclick="addToCart()">ADD TO CART</button>
+        <button class="btn-primary add-to-cart-top customize-add-btn" onclick="addToCart()">ADD TO CART</button>
       </div>
       <div class="customize-hero">
         <p class="pizza-description" id="customizePizzaDesc"></p>
@@ -234,7 +242,7 @@
       </div>
 
       <div class="customize-footer">
-        <button class="btn-primary btn-full" onclick="addToCart()">ADD TO CART</button>
+        <button class="btn-primary btn-full customize-add-btn" onclick="addToCart()">ADD TO CART</button>
       </div>
     </div>
   </section>
@@ -272,7 +280,10 @@
           </div>
         </div>
 
-        <button class="btn-primary btn-full" onclick="proceedToCheckout()">PROCEED TO CHECKOUT</button>
+        <div class="cart-footer-actions">
+          <button class="btn-outline btn-full" onclick="continueShopping()">CONTINUE SHOPPING</button>
+          <button class="btn-primary btn-full" onclick="proceedToCheckout()">PROCEED TO CHECKOUT</button>
+        </div>
         <p class="field-error" id="cartError" style="display:none;"></p>
       </div>
     </div>

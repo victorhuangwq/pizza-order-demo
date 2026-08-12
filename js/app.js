@@ -8,6 +8,7 @@ const orderState = {
   timing: 'now',
   currentCategory: null,
   selectedProduct: null,     // the product being customized
+  editingCartIndex: null,
   currentCustomization: {    // customization state (for customizable products)
     size: 'medium',
     crust: 'classic',
@@ -167,6 +168,11 @@ function confirmLocation(timing) {
     return 'Error: Please enter a delivery address before confirming location.';
   }
   if (timing) setTiming(timing);
+
+  if (orderState.currentCategory) {
+    return selectCategory(orderState.currentCategory);
+  }
+
   goToStep(3);
 
   const categories = CATEGORIES.map(c => c.name).join(', ');
@@ -185,12 +191,17 @@ function renderHomeCategoryGrid() {
   const grid = document.getElementById('homeCategoryGrid');
   if (!grid) return;
   grid.innerHTML = CATEGORIES.map(cat => `
-    <div class="home-cat-card" onclick="selectOrderType('delivery')">
+    <div class="home-cat-card" onclick="startCategoryOrder('${cat.id}')">
       ${cat.badge ? `<span class="home-cat-badge">${cat.badge}</span>` : ''}
       <div class="home-cat-img-placeholder">${CATEGORY_EMOJIS[cat.id] || '🍽️'}</div>
       <div class="home-cat-label">${cat.name}</div>
     </div>
   `).join('');
+}
+
+function startCategoryOrder(categoryId) {
+  orderState.currentCategory = categoryId;
+  return selectOrderType('delivery');
 }
 
 function renderCategories() {
@@ -225,17 +236,27 @@ function selectCategory(categoryId) {
 function renderProductList() {
   const grid = document.getElementById('productGrid');
   const items = getProductsByCategory(orderState.currentCategory);
+  const defaultSize = SIZES.find(size => size.id === 'medium');
+  const defaultCrust = CRUSTS.find(crust => crust.id === 'classic');
   grid.innerHTML = items.map(product => `
-    <div class="pizza-card" onclick="selectProductUI('${product.id}')">
+    <div class="pizza-card">
       <div class="pizza-card-img-wrap">
         ${product.tag ? `<span class="pizza-card-badge ${product.tag === 'TRENDING' ? 'trending' : ''}">${product.tag}</span>` : ''}
         <div class="pizza-card-img-placeholder">${product.emoji || '🍽️'}</div>
-        <button class="pizza-card-cart-btn" onclick="event.stopPropagation(); quickAddProduct('${product.id}')">🛒</button>
       </div>
       <div class="pizza-card-info">
         <div class="pizza-card-name">${product.name}</div>
         <div class="pizza-card-desc">${product.description}</div>
         <div class="pizza-card-price">${product.customizable ? 'From ' : ''}$${product.basePrice.toFixed(2)}</div>
+        ${product.customizable ? `<div class="pizza-card-default">${defaultSize.name} · ${defaultCrust.name} crust</div>` : ''}
+        <div class="product-card-actions">
+          ${product.customizable ? `
+            <button class="product-card-action product-card-action-secondary" onclick="selectProductUI('${product.id}')">CUSTOMIZE</button>
+            <button class="product-card-action product-card-action-primary" onclick="quickAddProduct('${product.id}')">ADD</button>
+          ` : `
+            <button class="product-card-action product-card-action-primary" onclick="selectProductUI('${product.id}')">ADD</button>
+          `}
+        </div>
       </div>
     </div>
   `).join('');
@@ -258,6 +279,7 @@ function selectProduct(productId) {
 
   // Customizable products (pizzas) go to the customize step
   orderState.selectedProduct = product;
+  orderState.editingCartIndex = null;
   orderState.currentCustomization = {
     size: 'medium',
     crust: 'classic',
@@ -293,7 +315,11 @@ function addSimpleProduct(product, quantity = 1) {
     });
   }
 
-  goToStep(6);
+  if (currentStep === 6) {
+    renderCart();
+  }
+  updateCartBadge();
+  showCartToast(product.name);
 
   const subtotal = getCartSubtotal();
   return `Added ${product.name} ($${product.basePrice.toFixed(2)}) to cart. Subtotal: $${subtotal.toFixed(2)} (${orderState.cart.length} items). You can continue shopping or proceed-to-checkout.`;
@@ -322,10 +348,15 @@ function renderCustomize() {
   const product = orderState.selectedProduct;
   if (!product) return;
   const cp = orderState.currentCustomization;
+  const isEditing = orderState.editingCartIndex !== null;
 
   document.getElementById('customizePizzaName').textContent = product.name.toUpperCase();
   document.getElementById('customizePizzaDesc').textContent = product.description;
   document.getElementById('customizeThumbName').textContent = product.name.toUpperCase();
+  document.getElementById('customizeBackBtn').textContent = isEditing ? '‹ Back to cart' : '‹ Back to products';
+  document.querySelectorAll('.customize-add-btn').forEach(button => {
+    button.textContent = isEditing ? 'SAVE CHANGES' : 'ADD TO CART';
+  });
 
   // Quantity
   document.getElementById('qtyValue').textContent = cp.quantity;
@@ -439,8 +470,18 @@ function addToCart() {
     calories: orderState.selectedProduct.calories
   };
 
-  orderState.cart.push(item);
-  goToStep(6);
+  const editingIndex = orderState.editingCartIndex;
+  if (editingIndex !== null && editingIndex >= 0 && editingIndex < orderState.cart.length) {
+    item.cartId = orderState.cart[editingIndex].cartId;
+    orderState.cart[editingIndex] = item;
+    orderState.editingCartIndex = null;
+    goToStep(6);
+  } else {
+    orderState.editingCartIndex = null;
+    orderState.cart.push(item);
+    goToStep(4);
+    showCartToast(item.name);
+  }
 
   const subtotal = getCartSubtotal();
   return `Added ${item.name} to cart (qty: ${cp.quantity}). Cart total: $${subtotal.toFixed(2)} (${orderState.cart.length} item${orderState.cart.length > 1 ? 's' : ''}). You can add more items or proceed-to-checkout.`;
@@ -522,15 +563,25 @@ function editCartItem(index) {
   const item = orderState.cart[index];
   if (item.product && item.product.customizable) {
     orderState.selectedProduct = item.product;
+    orderState.editingCartIndex = index;
     orderState.currentCustomization = {
       size: item.size,
       crust: item.crust,
       toppings: [...(item.toppings || [])],
       quantity: item.quantity
     };
-    orderState.cart.splice(index, 1);
     goToStep(5);
   }
+}
+
+function cancelCustomization() {
+  const returnToCart = orderState.editingCartIndex !== null;
+  orderState.editingCartIndex = null;
+  goToStep(returnToCart ? 6 : 4);
+}
+
+function continueShopping() {
+  goToStep(orderState.currentCategory ? 4 : 3);
 }
 
 function updateCartItem({ itemIndex, quantity }) {
@@ -712,6 +763,7 @@ function startNewOrder() {
   orderState.timing = 'now';
   orderState.currentCategory = null;
   orderState.selectedProduct = null;
+  orderState.editingCartIndex = null;
   orderState.currentCustomization = { size: 'medium', crust: 'classic', toppings: [], quantity: 1 };
   orderState.cart = [];
   orderState.contact = { firstName: '', lastName: '', phone: '', email: '' };
@@ -846,6 +898,34 @@ function updateCartBadge() {
   } else {
     badge.style.display = 'none';
   }
+}
+
+let cartToastTimer;
+
+function showCartToast(itemName) {
+  const toast = document.getElementById('cartToast');
+  const message = document.getElementById('cartToastMessage');
+  const viewCartButton = document.getElementById('cartToastViewButton');
+  if (!toast || !message || !viewCartButton) return;
+
+  const count = orderState.cart.reduce((sum, item) => sum + item.quantity, 0);
+  message.textContent = `${itemName} added to your cart.`;
+  viewCartButton.textContent = `VIEW CART (${count})`;
+  toast.hidden = false;
+
+  clearTimeout(cartToastTimer);
+  cartToastTimer = setTimeout(hideCartToast, 5000);
+}
+
+function hideCartToast() {
+  clearTimeout(cartToastTimer);
+  const toast = document.getElementById('cartToast');
+  if (toast) toast.hidden = true;
+}
+
+function viewCart() {
+  hideCartToast();
+  goToStep(6);
 }
 
 function showError(elementId, message) {

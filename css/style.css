@@ -170,6 +170,48 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
+.cart-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  width: min(520px, calc(100vw - 48px));
+  padding: 14px 16px;
+  border: 1px solid #D6B89F;
+  border-radius: 8px;
+  background: #FFF9F2;
+  box-shadow: 0 8px 28px rgba(59,36,28,0.18);
+  color: #3B241C;
+}
+.cart-toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #476348;
+  color: #fff;
+  font-weight: 800;
+}
+.cart-toast-message { font-size: 13px; font-weight: 700; }
+.cart-toast-view,
+.cart-toast-close {
+  border: none;
+  background: none;
+  color: #8F452E;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 800;
+}
+.cart-toast-view { font-size: 12px; }
+.cart-toast-close { padding: 4px; font-size: 13px; }
+.cart-toast-view:hover { text-decoration: underline; }
+
 /* ---------- Buttons ---------- */
 .btn-primary {
   background: #B65A3A;
@@ -686,7 +728,6 @@ a:hover { text-decoration: underline; }
   background: #fff;
   border-radius: 8px;
   overflow: hidden;
-  cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
   box-shadow: 0 1px 3px rgba(59,36,28,0.08);
   border: 1px solid #E8D6C6;
@@ -726,26 +767,6 @@ a:hover { text-decoration: underline; }
 }
 .pizza-card-badge.trending { background: #8F452E; }
 
-.pizza-card-cart-btn {
-  position: absolute;
-  bottom: 14px;
-  right: 14px;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #B65A3A;
-  color: #fff;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  box-shadow: 0 3px 10px rgba(182,90,58,0.35);
-}
-.pizza-card-cart-btn:hover { background: #87402B; transform: scale(1.08); }
-
 .pizza-card-info { padding: 16px 18px 20px; }
 .pizza-card-name { font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #3B241C; }
 .pizza-card-desc {
@@ -763,6 +784,42 @@ a:hover { text-decoration: underline; }
   font-weight: 800;
   color: #8F452E;
 }
+.pizza-card-default {
+  margin-top: 3px;
+  color: #78675E;
+  font-size: 11px;
+  font-weight: 600;
+}
+.product-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.product-card-action {
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.25px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.product-card-action:only-child { grid-column: 1 / -1; }
+.product-card-action-primary {
+  border: 1px solid #B65A3A;
+  background: #B65A3A;
+  color: #fff;
+}
+.product-card-action-primary:hover { border-color: #87402B; background: #87402B; }
+.product-card-action-secondary {
+  border: 1px solid #C9A98F;
+  background: #fff;
+  color: #8F452E;
+}
+.product-card-action-secondary:hover { border-color: #8F452E; background: #FFF4E9; }
 
 /* ---------- Step 5: Customize Pizza ---------- */
 .customize-page {
@@ -774,12 +831,23 @@ a:hover { text-decoration: underline; }
 }
 
 .customize-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
+  gap: 20px;
   padding: 20px 0;
   border-bottom: 2px solid #f0f0f0;
 }
+.customize-back {
+  border: none;
+  background: none;
+  color: #8F452E;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+.customize-back:hover { text-decoration: underline; }
 .pizza-name-headline {
   font-family: 'Montserrat', 'DM Sans', sans-serif;
   font-size: 28px;
@@ -1091,6 +1159,12 @@ a:hover { text-decoration: underline; }
 }
 .side-card-cart-btn:hover { background: #87402B; transform: scale(1.08); }
 
+.cart-footer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 /* ---------- Step 7: Checkout ---------- */
 .checkout-page {
   max-width: 1100px;
@@ -1322,6 +1396,20 @@ a:hover { text-decoration: underline; }
   .sides-grid { grid-template-columns: 1fr; }
   .order-type-buttons { flex-direction: column; }
   .order-type-or { display: none; }
+  .customize-header {
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+  }
+  .customize-back { grid-column: 1 / -1; justify-self: start; }
+  .cart-toast {
+    right: 12px;
+    bottom: 12px;
+    grid-template-columns: auto 1fr auto;
+    width: calc(100vw - 24px);
+  }
+  .cart-toast-view { grid-column: 2; justify-self: start; }
+  .cart-toast-close { grid-column: 3; grid-row: 1; }
+  .cart-footer-actions { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 420px) {
