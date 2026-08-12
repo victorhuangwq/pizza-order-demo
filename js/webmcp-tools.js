@@ -1,6 +1,6 @@
 // webmcp-tools.js - WebMCP tool definitions for Contoso Pizza
-// Exposes three agentic tools: browse, create-order, checkout.
-// These are always registered — no per-step swapping needed.
+// Exposes four agentic tools: browse, create-order, update-order, checkout.
+// Availability follows the current order state.
 
 // ============ TOOL: browse ============
 
@@ -478,7 +478,6 @@ The system will prompt the user for confirmation via a browser dialog before fin
       // Yield to let the browser repaint the filled-in form before the blocking confirm dialog
       await new Promise(r => setTimeout(r, 50));
 
-      // Place the order (will prompt the user via confirm() before finalizing)
       return placeOrder();
     }
   };
@@ -486,41 +485,73 @@ The system will prompt the user for confirmation via a browser dialog before fin
 
 // ============ REGISTRATION ============
 
-// Per-tool AbortControllers so we can unregister individually.
-const toolControllers = new Map();
-
-function ensureToolRegistered(name, createFn) {
-  if (toolControllers.has(name)) return; // already registered
-  const controller = new AbortController();
-  document.modelContext.registerTool(createFn(), { signal: controller.signal });
-  toolControllers.set(name, controller);
-}
-
-function ensureToolUnregistered(name) {
-  const controller = toolControllers.get(name);
-  if (!controller) return; // not registered
-  controller.abort();
-  toolControllers.delete(name);
-}
+const registeredTools = new Map();
+let activeWebMCPExecutions = 0;
+let pendingRegistrationStep = null;
+let registrationRefreshTimer;
 
 function registerToolsForStep(step) {
+  if (activeWebMCPExecutions > 0) {
+    pendingRegistrationStep = step;
+    return;
+  }
+
+  clearTimeout(registrationRefreshTimer);
   if (!('modelContext' in document)) return;
+  const modelContext = document.modelContext;
 
-  // browse and create-order are always available.
-  ensureToolRegistered('browse', createBrowseTool);
-  ensureToolRegistered('create-order', createCreateOrderTool);
+  for (const controller of registeredTools.values()) {
+    controller.abort();
+  }
+  registeredTools.clear();
 
-  // update-order is available once the cart is populated.
+  const tools = [createBrowseTool(), createCreateOrderTool()];
+
   if (orderState.cart.length > 0) {
-    ensureToolRegistered('update-order', createUpdateOrderTool);
-  } else {
-    ensureToolUnregistered('update-order');
+    tools.push(createUpdateOrderTool());
   }
 
-  // checkout is only offered once the cart is populated and we're at checkout.
   if (step >= 7 && orderState.cart.length > 0) {
-    ensureToolRegistered('checkout', createCheckoutTool);
-  } else {
-    ensureToolUnregistered('checkout');
+    tools.push(createCheckoutTool());
   }
+
+  for (const tool of tools) {
+    const registeredTool = normalizeWebMCPTool(tool);
+
+    const controller = new AbortController();
+    registeredTools.set(tool.name, controller);
+    modelContext.registerTool(registeredTool, { signal: controller.signal }).catch(error => {
+      if (error.name !== 'AbortError') {
+        console.error(`Failed to register WebMCP tool "${tool.name}":`, error);
+      }
+    });
+  }
+}
+
+function normalizeWebMCPTool(tool) {
+  return {
+    ...tool,
+    async execute(...args) {
+      activeWebMCPExecutions++;
+      try {
+        const result = await tool.execute(...args);
+        if (result && Array.isArray(result.content)) {
+          return result;
+        }
+        return {
+          content: [{
+            type: 'text',
+            text: String(result)
+          }]
+        };
+      } finally {
+        activeWebMCPExecutions--;
+        if (activeWebMCPExecutions === 0) {
+          const step = pendingRegistrationStep ?? currentStep;
+          pendingRegistrationStep = null;
+          registrationRefreshTimer = setTimeout(() => registerToolsForStep(step), 0);
+        }
+      }
+    }
+  };
 }

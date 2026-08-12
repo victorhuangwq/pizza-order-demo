@@ -16,7 +16,7 @@ This is a **single-page 7-step pizza ordering wizard** that demonstrates the [We
 
 ### Core pattern: agent-optimized flow
 
-`webmcp-tools.js` registers high-level tools — `browse`, `create-order`, `update-order`, and `checkout` — via `document.modelContext.registerTool(tool, { signal })`. `browse` and `create-order` are **always registered**; `update-order` and `checkout` are added once the cart is populated (step ≥ 7). Each tool has its own `AbortController`, so individual tools can be unregistered by aborting their signal.
+`webmcp-tools.js` registers four high-level tools through `document.modelContext.registerTool()`: `browse` and `create-order` are always available, `update-order` is added once the cart is populated, and `checkout` is added at checkout. Registrations use `AbortController` signals so each navigation step replaces the prior tool set cleanly.
 
 ### Agent modal
 
@@ -29,10 +29,9 @@ UI click handlers and WebMCP tool `execute` callbacks call the **same functions*
 ### Key files
 
 - **`js/app.js`** — Wizard controller: `orderState` object, step navigation (`goToStep`), all business logic functions (e.g., `selectOrderType`, `setDeliveryAddress`, `addToCart`, `addSimpleProduct`), DOM rendering per step, price calculation, and agent modal helpers (`showAgentModal`, `hideAgentModal`).
-- **`js/webmcp-tools.js`** — Three tool definitions: `browse` (returns full menu), `create-order` (builds a cart in one call), and `checkout` (sets contact info and places order). Each tool's `execute` delegates to corresponding `app.js` functions.
+- **`js/webmcp-tools.js`** — Four tool definitions: `browse` (returns full menu), `create-order` (builds a cart in one call), `update-order` (changes a populated cart), and `checkout` (sets contact info and places order). Each tool's `execute` delegates to corresponding `app.js` functions.
 - **`js/menu-data.js`** — Unified `PRODUCTS` array (every orderable item with a `customizable` flag and `category`), helper functions `getProductsByCategory()` and `getProductById()`, plus `SIZES`, `CRUSTS`, `TOPPINGS`, and pricing constants (`DELIVERY_FEE`, `TAX_RATE`).
 - **`index.html`** — All 7 steps as `<section>` elements, shown/hidden by `goToStep()`.
-- **`extension/`** — Separate Chrome extension for inspecting WebMCP tools (has its own `package.json` and `manifest.json`). Not part of the main app.
 
 ### Step → Tool mapping
 
@@ -40,13 +39,14 @@ UI click handlers and WebMCP tool `execute` callbacks call the **same functions*
 |------|-----------|---------|
 | `browse` | Always | Returns full menu as JSON; shows agent modal |
 | `create-order` | Always | Builds a complete cart (order type, address, items with optional pizza customization) in one call; hides agent modal and navigates to checkout |
+| `update-order` | Cart non-empty | Adds or removes products and changes quantities |
 | `checkout` | Step ≥ 7, cart non-empty | Sets contact info, prompts user confirmation, places order |
 
 ## Conventions
 
 - **Tool responses** always return `{ content: [{ type: "text", text: "..." }] }` with a confirmation of what was done, current state summary, and a hint for next action.
 - **Validation errors** are returned as content text (not exceptions): `"Error: Please enter a delivery address."`.
-- **`checkout`** prompts the user for confirmation via a browser `confirm()` dialog before finalizing.
+- **`checkout`** gets explicit user confirmation via a browser `confirm()` dialog before completing.
 - **Feature detection**: the site works as a normal ordering site without WebMCP. Tools are registered only when `document.modelContext` is available.
 - **Pricing logic**: Customizable products (pizzas): base price plus the selected size and crust modifiers, plus extra toppings beyond defaults at $1.25 each. Non-customizable products use flat `basePrice`. Delivery fee is $4.50 and illustrative tax is 8.75%.
 - **Unified product catalog**: All orderable items live in a single `PRODUCTS` array in `menu-data.js`. Products with `customizable: true` (pizzas) support size/crust/topping selection; all others are simple add-to-cart items. The old separate `PIZZAS` and `SIDES` arrays have been removed.

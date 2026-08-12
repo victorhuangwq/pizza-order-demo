@@ -699,17 +699,13 @@ async function placeOrder() {
 
   const totals = calculateTotals();
 
-  // Confirm via browser dialog. The new WebMCP API
-  // (ToolExecuteCallback signature: Promise<any>(object input)) no longer
-  // passes an `agent` argument with requestUserInteraction — tools that need
-  // user confirmation drive it directly through the page UI.
-  const ok = confirm(
+  const confirmed = confirm(
     `Place order for $${totals.total.toFixed(2)}?\n` +
     `${orderState.orderType === 'delivery' ? `Delivery to: ${orderState.address}` : `Carryout from: ${orderState.store.name}`}\n` +
-    `${orderState.cart.map(i => `  ${i.quantity}x ${i.name}`).join('\n')}\n\n` +
-    `Click OK to confirm.`
+    `${orderState.cart.map(item => `  ${item.quantity}x ${item.name}`).join('\n')}\n\n` +
+    'Click OK to confirm.'
   );
-  if (!ok) return 'Order cancelled by user.';
+  if (!confirmed) return 'Order cancelled by user.';
 
   // Generate order number
   const orderNumber = `CP-${String(Math.floor(10000 + Math.random() * 90000))}`;
